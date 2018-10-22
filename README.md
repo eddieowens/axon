@@ -11,8 +11,8 @@ go get github.com/eddieowens/axon
 Define some interface with the `axon.Instance` interface embedded
 ```go
 type TestService interface {
-	axon.Instance
-	DoTestStuff() string
+    axon.Instance
+    DoTestStuff() string
 }
 ```
 
@@ -24,11 +24,11 @@ type TestServiceImpl struct {
 }
 
 func (TestServiceImpl) GetInstanceName() string {
-	return TestServiceInstance
+    return TestServiceInstance
 }
 
 func (TestServiceImpl) DoTestStuff() string {
-	return "test!"
+    return "test!"
 }
 ```
 The `axon.Instance` interface requires a single method which defines your service's referent for your 
@@ -41,15 +41,15 @@ package main
 var Injector axon.Injector
 
 func main() {
-	Injector = CreateInjector()
+    Injector = CreateInjector()
 }
 
 func CreateInjector() axon.Injector {
-	binder := []axon.BinderEntry{
-		{Instance: testServiceImpl{}},
-	}
-	
-	return axon.NewInjector(binder)
+    binder := []axon.BinderEntry{
+        {Instance: testServiceImpl{}},
+    }
+    
+    return axon.NewInjector(binder)
 }
 ```
 The `axon.Injector` is a manager for singletons created as defined within your `axon.Binder` which is
@@ -59,8 +59,8 @@ more about customizing the binder your injector manages
 Now get your newly created service!
 ```go
 func SomethingToDoInMyApp() {
-	testService := Instance.GetInstance(TestServiceInstance).(TestService)
-	fmt.Println(testService.DoTestStuff()) // Prints "test!"
+    testService := Instance.GetInstance(TestServiceInstance).(TestService)
+    fmt.Println(testService.DoTestStuff()) // Prints "test!"
 }
 ```
 
@@ -71,20 +71,20 @@ type TestServiceMock struct {
 }
 
 func (TestServiceMock) GetInstanceName() string {
-	return TestServiceInstance
+    return TestServiceInstance
 }
 
 func (TestServiceMock) DoTestStuff() string {
-	return "I'm a mock!"
+    return "I'm a mock!"
 }
 ```
 
 Create the injector and override the `TestServiceImpl` instance with your mock
 ```go
 func TestSomethingThatUsesTestService(t *testing.T) {
-	injector := CreateInjector() // don't worry, this call is incredibly light even for very large binders
-	injector.AddInstance(TestServiceMock{})
-	...
+    injector := CreateInjector() // don't worry, this call is incredibly light even for very large binders
+    injector.AddInstance(TestServiceMock{})
+    ...
 }
 ```
 Now wherever `injector.GetInstance("testService")` is called, the mock will be returned.
