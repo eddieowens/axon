@@ -45,6 +45,20 @@ func TestInjectTestServiceMock(t *testing.T) {
 	asrt.Equal("I'm a mock provider!", injector.GetInstance("testService1").(testService).DoTestStuff())
 }
 
+func TestMultipleAddInstance(t *testing.T) {
+	asrt := assert.New(t)
+	injector := createInjector()
+
+	injector.GetInstance("testService1")
+	r := injector.GetInstance(testServiceDependencyInstanceName).(testServiceDependency)
+	asrt.Equal("im the dependency!", r.DoEvenMoreTestStuff())
+
+	injector.AddInstance(new(mockTestServiceDependency))
+	mock := injector.GetInstance(testServiceDependencyInstanceName).(testServiceDependency)
+
+	asrt.Equal("this is a mock!", mock.DoEvenMoreTestStuff())
+}
+
 func createInjector() axon.Injector {
 	binder := []axon.BinderEntry{
 		{

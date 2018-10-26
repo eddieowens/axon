@@ -17,6 +17,8 @@ type Injector interface {
 
 	// Add an Instance to the Injector. If the Instance with the referent (created by Instance.GetInstanceName()) already
 	// exists, it is overwritten with the provided Instance.
+	//
+	// Every time this is called, the dependency graph will be cleared and rebuilt
 	AddInstance(instance Instance)
 
 	// Same as AddInstance but allows for the manual override of the Instance's referent within
@@ -36,6 +38,7 @@ type Instance interface {
 
 type injectorImpl struct {
 	binderInstances   binderInstances
+	binder            Binder
 	atomicProviderMap map[string]*atomicProvider
 	lock              sync.Mutex
 }
@@ -43,12 +46,18 @@ type injectorImpl struct {
 func (i *injectorImpl) AddInstanceWithKey(key string, instance Instance) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
+	bi, ap := hydrateInjector(i.binder)
+	i.binderInstances = bi
+	i.atomicProviderMap = ap
 	i.binderInstances[key] = instance
 }
 
 func (i *injectorImpl) AddInstance(instance Instance) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
+	bi, ap := hydrateInjector(i.binder)
+	i.binderInstances = bi
+	i.atomicProviderMap = ap
 	i.binderInstances[instance.GetInstanceName()] = instance
 }
 
