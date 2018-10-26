@@ -21,7 +21,7 @@ func TestNewInjector(t *testing.T) {
 
 	injector := axon.NewInjector(binder)
 
-	asrt.Equal("test!", injector.GetInstance("testService1").(testService).DoTestStuff())
+	asrt.Equal("im the dependency!test!", injector.GetInstance("testService1").(testService).DoTestStuff())
 	asrt.NotNil("im the dependency!", injector.GetInstance(testServiceDependencyInstanceName).(testServiceDependency).DoEvenMoreTestStuff())
 }
 
@@ -49,14 +49,13 @@ func TestMultipleAddInstance(t *testing.T) {
 	asrt := assert.New(t)
 	injector := createInjector()
 
-	injector.GetInstance("testService1")
-	r := injector.GetInstance(testServiceDependencyInstanceName).(testServiceDependency)
-	asrt.Equal("im the dependency!", r.DoEvenMoreTestStuff())
+	ts := injector.GetInstance("testService1").(testService)
+	asrt.Equal("im the dependency!test!", ts.DoTestStuff())
 
 	injector.AddInstance(new(mockTestServiceDependency))
-	mock := injector.GetInstance(testServiceDependencyInstanceName).(testServiceDependency)
+	mock := injector.GetInstance("testService1").(testService)
 
-	asrt.Equal("this is a mock!", mock.DoEvenMoreTestStuff())
+	asrt.Equal("this is a mock!test!", mock.DoTestStuff())
 }
 
 func createInjector() axon.Injector {

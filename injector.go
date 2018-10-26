@@ -92,6 +92,7 @@ func newInjector(binder Binder) Injector {
 	return &injectorImpl{
 		binderInstances:   bi,
 		atomicProviderMap: ap,
+		binder:            binder,
 		lock:              sync.Mutex{},
 	}
 }

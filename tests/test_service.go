@@ -22,6 +22,6 @@ func (testServiceImpl) GetInstanceName() string {
 	return "testService"
 }
 
-func (testServiceImpl) DoTestStuff() string {
-	return "test!"
+func (t testServiceImpl) DoTestStuff() string {
+	return t.testServiceDependency.DoEvenMoreTestStuff() + "test!"
 }
