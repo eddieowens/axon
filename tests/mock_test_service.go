@@ -2,17 +2,17 @@ package tests
 
 import "axon"
 
-type mockTestService struct {
+type MockTestService struct {
 }
 
-func testServiceMockFactory(injector axon.Injector, _ ...interface{}) axon.Instance {
-	return mockTestService{}
+func TestServiceMockFactory() axon.Instance {
+	return new(MockTestService)
 }
 
-func (mockTestService) GetInstanceName() string {
+func (MockTestService) GetInstanceName() string {
 	return "testService"
 }
 
-func (mockTestService) DoTestStuff() string {
+func (MockTestService) DoTestStuff() string {
 	return "I'm a mock provider!"
 }

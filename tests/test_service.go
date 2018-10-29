@@ -2,26 +2,23 @@ package tests
 
 import "axon"
 
-type testService interface {
+type TestService interface {
 	axon.Instance
 	DoTestStuff() string
 }
 
-type testServiceImpl struct {
-	testServiceDependency testServiceDependency
+type TestServiceImpl struct {
+	TestServiceDependency TestServiceDependency `inject:"testServiceDependency"`
 }
 
-func testServiceFactory(injector axon.Injector, _ ...interface{}) axon.Instance {
-	testServiceDependency := injector.GetInstance("testServiceDependency").(testServiceDependency)
-	return testServiceImpl{
-		testServiceDependency: testServiceDependency,
-	}
+func TestServiceFactory() axon.Instance {
+    return new(TestServiceImpl)
 }
 
-func (testServiceImpl) GetInstanceName() string {
+func (TestServiceImpl) GetInstanceName() string {
 	return "testService"
 }
 
-func (t testServiceImpl) DoTestStuff() string {
-	return t.testServiceDependency.DoEvenMoreTestStuff() + "test!"
+func (t TestServiceImpl) DoTestStuff() string {
+	return t.TestServiceDependency.DoEvenMoreTestStuff() + "test!"
 }

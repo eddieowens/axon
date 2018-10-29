@@ -2,20 +2,20 @@ package tests
 
 import "axon"
 
-const testServiceDependencyInstanceName = "testServiceDependency"
+const TestServiceDependencyInstanceName = "testServiceDependency"
 
-type testServiceDependency interface {
+type TestServiceDependency interface {
 	axon.Instance
 	DoEvenMoreTestStuff() string
 }
 
-type testServiceDependencyImpl struct {
+type TestServiceDependencyImpl struct {
 }
 
-func (*testServiceDependencyImpl) GetInstanceName() string {
-	return testServiceDependencyInstanceName
+func (*TestServiceDependencyImpl) GetInstanceName() string {
+	return TestServiceDependencyInstanceName
 }
 
-func (*testServiceDependencyImpl) DoEvenMoreTestStuff() string {
+func (*TestServiceDependencyImpl) DoEvenMoreTestStuff() string {
 	return "im the dependency!"
 }

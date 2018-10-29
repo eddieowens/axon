@@ -1,12 +1,12 @@
 package tests
 
-type mockTestServiceDependency struct {
+type MockTestServiceDependency struct {
 }
 
-func (*mockTestServiceDependency) GetInstanceName() string {
-	return testServiceDependencyInstanceName
+func (*MockTestServiceDependency) GetInstanceName() string {
+	return TestServiceDependencyInstanceName
 }
 
-func (*mockTestServiceDependency) DoEvenMoreTestStuff() string {
+func (*MockTestServiceDependency) DoEvenMoreTestStuff() string {
 	return "this is a mock!"
 }

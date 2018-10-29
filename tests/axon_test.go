@@ -1,73 +1,80 @@
 package tests
 
 import (
-	"axon"
-	"github.com/stretchr/testify/assert"
-	"testing"
+    "github.com/stretchr/testify/assert"
+    "testing"
+    . "axon"
 )
 
 func TestNewInjector(t *testing.T) {
-	asrt := assert.New(t)
+    asrt := assert.New(t)
 
-	binder := []axon.BinderEntry{
-		{
-			Provider: &axon.Provider{Factory: testServiceFactory},
-			Name:     "testService1",
-		},
-		{
-			Instance: &testServiceDependencyImpl{},
-		},
-	}
+    binder := []BinderEntry{
+        {
+            Provider: &Provider{
+                Factory:      TestServiceFactory,
+                InstanceName: "testService",
+            },
+        },
+        {
+            Instance: &TestServiceDependencyImpl{},
+        },
+    }
 
-	injector := axon.NewInjector(binder)
+    injector := NewInjector(binder)
 
-	asrt.Equal("im the dependency!test!", injector.GetInstance("testService1").(testService).DoTestStuff())
-	asrt.NotNil("im the dependency!", injector.GetInstance(testServiceDependencyInstanceName).(testServiceDependency).DoEvenMoreTestStuff())
+    asrt.Equal("im the dependency!test!", injector.GetInstance("testService").(TestService).DoTestStuff())
+    asrt.NotNil("im the dependency!", injector.GetInstance(TestServiceDependencyInstanceName).(TestServiceDependency).DoEvenMoreTestStuff())
 }
 
 func TestInjectTestServiceDependencyMock(t *testing.T) {
-	asrt := assert.New(t)
+    asrt := assert.New(t)
 
-	injector := createInjector()
+    injector := createInjector()
 
-	injector.AddInstance(&mockTestServiceDependency{})
+    injector.AddInstance(&MockTestServiceDependency{})
 
-	asrt.Equal("this is a mock!", injector.GetInstance(testServiceDependencyInstanceName).(testServiceDependency).DoEvenMoreTestStuff())
+    asrt.Equal("this is a mock!", injector.GetInstance(TestServiceDependencyInstanceName).(TestServiceDependency).DoEvenMoreTestStuff())
 }
 
 func TestInjectTestServiceMock(t *testing.T) {
-	asrt := assert.New(t)
+    asrt := assert.New(t)
 
-	injector := createInjector()
+    injector := createInjector()
 
-	injector.AddProvider("testService1", &axon.Provider{Factory: testServiceMockFactory})
+    injector.AddProvider("testService", &Provider{Factory: TestServiceMockFactory})
 
-	asrt.Equal("I'm a mock provider!", injector.GetInstance("testService1").(testService).DoTestStuff())
+    asrt.Equal("I'm a mock provider!", injector.GetInstance("testService").(TestService).DoTestStuff())
 }
 
 func TestMultipleAddInstance(t *testing.T) {
-	asrt := assert.New(t)
-	injector := createInjector()
+    asrt := assert.New(t)
+    injector := createInjector()
 
-	ts := injector.GetInstance("testService1").(testService)
-	asrt.Equal("im the dependency!test!", ts.DoTestStuff())
+    ts := injector.GetInstance("testService").(TestService)
+    asrt.Equal("im the dependency!test!", ts.DoTestStuff())
 
-	injector.AddInstance(new(mockTestServiceDependency))
-	mock := injector.GetInstance("testService1").(testService)
+    injector.AddInstance(new(MockTestServiceDependency))
+    injector.AddInstance(injector.GetInstance(TestServiceDependencyInstanceName))
+    injector.GetInstance("testService")
+    injector.AddInstance(new(MockTestServiceDependency))
+    mock := injector.GetInstance("testService").(TestService)
 
-	asrt.Equal("this is a mock!test!", mock.DoTestStuff())
+    asrt.Equal("this is a mock!test!", mock.DoTestStuff())
 }
 
-func createInjector() axon.Injector {
-	binder := []axon.BinderEntry{
-		{
-			Provider: &axon.Provider{Factory: testServiceFactory},
-			Name:     "testService1",
-		},
-		{
-			Instance: &testServiceDependencyImpl{},
-		},
-	}
+func createInjector() Injector {
+    binder := []BinderEntry{
+        {
+            Provider: &Provider{
+                Factory:      TestServiceFactory,
+                InstanceName: "testService",
+            },
+        },
+        {
+            Instance: &TestServiceDependencyImpl{},
+        },
+    }
 
-	return axon.NewInjector(binder)
+    return NewInjector(binder)
 }
