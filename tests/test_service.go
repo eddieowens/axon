@@ -9,10 +9,11 @@ type TestService interface {
 
 type TestServiceImpl struct {
 	TestServiceDependency TestServiceDependency `inject:"testServiceDependency"`
+	SomethingElse         string
 }
 
 func TestServiceFactory() axon.Instance {
-    return new(TestServiceImpl)
+	return new(TestServiceImpl)
 }
 
 func (TestServiceImpl) GetInstanceName() string {
