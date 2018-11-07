@@ -98,7 +98,7 @@ type (*HigherLevelServiceImpl) DoSomething() string {
 // The factory that is used within a Provider in a Binder. This factory will be called 
 // when injector.GetInstance("higherLevelService") is called and a ptr to a HigherLevelServiceImpl
 // will be returned
-func HigherLevelServiceFactory() axon.Instance {
+func HigherLevelServiceFactory(args axon.Args) axon.Instance {
     return new(HigherLevelServiceImpl)
 }
 ```

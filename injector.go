@@ -164,7 +164,11 @@ func (i *injectorImpl) GetInstance(key string) Instance {
 			panic(fmt.Sprintf("unknown instance %s", key))
 		}
 		ap.once.Do(func() {
-			instance = ap.provider.Factory()
+			if ap.provider.Args == nil {
+				instance = ap.provider.Factory(nil)
+			} else {
+				instance = ap.provider.Factory(ap.provider.Args)
+			}
 			v := reflect.ValueOf(instance).Elem()
 			for j := 0; j < v.NumField(); j++ {
 				depInstanceName := v.Type().Field(j).Tag.Get("inject")
