@@ -133,7 +133,6 @@ func (i *injectorImpl) AddInstance(instance Instance) {
 	defer i.lock.Unlock()
 	i.binderInstances[instance.GetInstanceName()] = instance
 	i.clearInstanceDeps(instance.GetInstanceName())
-
 }
 
 func (i *injectorImpl) AddProvider(key string, provider *Provider) {
@@ -153,6 +152,7 @@ func (i *injectorImpl) clearInstanceDeps(instanceName string) {
 	for _, v := range i.dependencyMap[instanceName] {
 		delete(i.binderInstances, v)
 		i.atomicProviderMap[v].once = sync.Once{}
+		i.clearInstanceDeps(v)
 	}
 }
 

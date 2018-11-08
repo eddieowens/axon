@@ -10,12 +10,17 @@ type TestServiceDependency interface {
 }
 
 type TestServiceDependencyImpl struct {
+	DepTwo DepTwo `inject:"DepTwo"`
 }
 
 func (*TestServiceDependencyImpl) GetInstanceName() string {
 	return TestServiceDependencyInstanceName
 }
 
-func (*TestServiceDependencyImpl) DoEvenMoreTestStuff() string {
-	return "im the dependency!"
+func (t *TestServiceDependencyImpl) DoEvenMoreTestStuff() string {
+	return t.DepTwo.CallDepTwo() + " im the dependency!"
+}
+
+func TestServiceDependencyFactory(_ axon.Args) axon.Instance {
+	return new(TestServiceDependencyImpl)
 }
