@@ -27,7 +27,9 @@ func (f Args) String(idx int) (val string) {
 // an zero int is returned
 func (f Args) Int(idx int) (val int) {
 	if idx < len(f) {
-		val = f[idx].(int)
+		if v, ok := f[idx].(int); ok {
+			val = v
+		}
 	}
 	return
 }
@@ -36,7 +38,9 @@ func (f Args) Int(idx int) (val int) {
 // an zero int64 is returned
 func (f Args) Int64(idx int) (val int64) {
 	if idx < len(f) {
-		val = f[idx].(int64)
+		if v, ok := f[idx].(int64); ok {
+			val = v
+		}
 	}
 	return
 }
@@ -45,7 +49,9 @@ func (f Args) Int64(idx int) (val int64) {
 // an zero uint is returned
 func (f Args) UInt(idx int) (val uint) {
 	if idx < len(f) {
-		val = f[idx].(uint)
+		if v, ok := f[idx].(uint); ok {
+			val = v
+		}
 	}
 	return
 }
@@ -54,7 +60,9 @@ func (f Args) UInt(idx int) (val uint) {
 // an zero float32 is returned
 func (f Args) Float32(idx int) (val float32) {
 	if idx < len(f) {
-		val = f[idx].(float32)
+		if v, ok := f[idx].(float32); ok {
+			val = v
+		}
 	}
 	return
 }
@@ -63,7 +71,20 @@ func (f Args) Float32(idx int) (val float32) {
 // an zero float64 is returned
 func (f Args) Float64(idx int) (val float64) {
 	if idx < len(f) {
-		val = f[idx].(float64)
+		if v, ok := f[idx].(float64); ok {
+			val = v
+		}
+	}
+	return
+}
+
+// Gets a bool from the Args. If the passed in index is not a bool or does not exist,
+// false is returned
+func (f Args) Bool(idx int) (val bool) {
+	if idx < len(f) {
+		if v, ok := f[idx].(bool); ok {
+			val = v
+		}
 	}
 	return
 }
