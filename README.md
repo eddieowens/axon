@@ -1,5 +1,6 @@
 # axon
-A simple, lightweight, and lazy-loaded DI (really just a singleton management) library.
+A simple, lightweight, and lazy-loaded DI (really just a singleton management) library influenced by multiple DI 
+libraries but more specifically Google's [Guice](https://github.com/google/guice).
 
 ## Install
 ```bash
