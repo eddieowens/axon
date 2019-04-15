@@ -1,220 +1,257 @@
 package axon
 
 import (
-	"fmt"
 	"reflect"
 	"sync"
 )
 
-// An injector is, in essence, a map of a string key to either an [Instance](#instance) or a
-// Provider. When a user calls GetInstance(string) they are providing
-// the key into the map which will either simply return the instance, or construct it via the
-// Provider.Factory field.
+// An Injector is, in essence, a map of a string Key to an Injectable Entity (Instance or a Provider). When a user calls
+// injector.Get(key string) they are providing the key into the map which will either simply return the instance,
+// or construct it via the Provider's Factory.
 //
-// This is the main object you will interact with to get whatever you place into the injector via a Binder
+// This is the main object you will interact with to get whatever you place into the injector via a Binder.
 type Injector interface {
-	// Gets a specific Instance within the Injector. If the Instance does not yet exist (created via a Provider) it is constructed here.
-	// If the key is not found a panic occurs.
-	GetInstance(key string) Instance
+	// Gets a specific Instance within the Injector. If the Instance does not yet exist (created via a Provider) it is
+	// constructed here. If the key is not found, nil is returned.
+	Get(key string) Instance
 
-	// Add a Provider to the Injector so the next time the Instance is being retrieved, the following
-	// Provider will be used to build it.
-	AddProvider(key string, provider *Provider)
+	// Get a struct Instance from the injector. This will always return a pointer to whatever struct
+	// was passed in via the Binding. If not found, nil is returned.
+	GetStructPtr(key string) interface{}
 
-	// Add an Instance to the Injector. If the Instance with the referent (created by Instance.GetInstanceName()) already
-	// exists, it is overwritten with the provided Instance.
+	// Get a bool Instance from the Injector. If not found, false is returned.
+	GetBool(key string) bool
+
+	// Get a int Instance from the Injector. If not found, 0 is returned.
+	GetInt(key string) int
+
+	// Get a string Instance from the Injector. If not found, "" is returned.
+	GetString(key string) string
+
+	// Get a float32 Instance from the Injector. If not found, 0 is returned.
+	GetFloat32(key string) float32
+
+	// Get a float64 Instance from the Injector. If not found, 0 is returned.
+	GetFloat64(key string) float64
+
+	// Get a int64 Instance from the Injector. If not found, 0 is returned.
+	GetInt64(key string) int64
+
+	// Get a int32 Instance from the Injector. If not found, 0 is returned.
+	GetInt32(key string) int32
+
+	// Add an Instance to the Injector. If the Instance with the specified key already exists, it is replaced.
 	//
-	// Every time this is called, all dependencies of whatever was added will be rebuilt on subsequent GetInstance(string)
+	// Every time this is called, all dependencies of the Instance will be rebuilt on subsequent Get*(string)
 	// calls.
-	AddInstance(instance Instance)
+	//
+	// WARNING: Do not use this method at runtime within source code. This method is for TESTING purposes in order to
+	// provide mocks without having to define a completely separate Binder. If you use this within source code, it will
+	// work within a synchronous environment but has undefined behavior in an asynchronous environment.
+	Add(key string, instance Instance)
 
-	// Same as AddInstance but allows for the manual override of the Instance's referent within
-	// the injector.
-	AddInstanceWithKey(key string, instance Instance)
-}
-
-// An Instance is an interface with a single method; GetInstanceName() string. This
-// method is what is used to identify the Instance when it is within the Injector.
-// For example
-//   type TestService interface {
-//       axon.Instance // All implementations of this service are now an axon.Instance
-//       DoServiceThings() string
-//   }
-//
-//   type TestServiceImpl struct {
-//   }
-//
-//   func (*TestServiceImpl) GetInstanceName() string {
-//       return "testService"
-//   }
-//
-//   func (*TestServiceImpl) DoServiceThings() string {
-//       return "I'm a service!"
-//   }
-// After adding the TestService to your Binder via a BinderEntry, all calls to
-// injector.GetInstance("testService") will return TestServiceImpl. To override the implementation define
-// another TestService called TestServiceImplTwo
-//   type TestServiceImplTwo struct {
-//   }
-//
-//   func (*TestServiceImplTwo) GetInstanceName() string {
-//       return "testService" // The exact same name as TestServiceImpl.GetInstanceName
-//   }
-//
-//   func (*TestServiceImplTwo) DoServiceThings() string {
-//       return "I'm the second service!"
-//   }
-// Now call
-//   injector.AddInstance(new(TestServiceImplTwo))
-// to override the key "testService" in the injector
-// with the TestServiceImplTwo instance. Every subsequent call to injector.GetInstance("testService) will
-// now return TestServiceImplTwo.
-//
-// This is also true for all calls to Instances that depend on a TestService. If you were to define another
-// service that depends on TestService like so
-//   type HigherLevelService interface {
-//       axon.Instance
-//   }
-//
-//   type HigherLevelServiceImpl struct {
-//       TestService TestService inject:"testService" // TestService dependency
-//   }
-//
-//   func (TestServiceImpl) GetInstanceName() string {
-//       return "higherLevelService"
-//   }
-//
-//   func HigherLevelServiceFactory() axon.Instance {
-//       return new(HigherLevelServiceImpl)
-//   }
-// And add HigherLevelService to your Binder through a Provider using the
-// HigherLevelServiceFactory function, whenever injector.GetInstance("higherLevelService") is called,
-// it will populate the TestService field with the TestServiceImplTwo implementation of TestService.
-//
-// Any field without the inject:"INSTANCE_NAME" tag will not be populated by the injector
-type Instance interface {
-	// The referent used to retrieve this Instance from the Injector
-	GetInstanceName() string
+	// Add a Provider to the Injector. If the Instance with the specified key already exists, it is replaced.
+	//
+	// Every time this is called, all dependencies of the Instance will be rebuilt on subsequent Get*(string)
+	// calls.
+	//
+	// WARNING: Do not use this method at runtime within source code. This method is for TESTING purposes in order to
+	// provide mocks without having to define a completely separate Binder. If you use this within source code, it will
+	// work within a synchronous environment but has undefined behavior in an asynchronous environment.
+	AddProvider(key string, provider Provider)
 }
 
 type injectorImpl struct {
 	// Instances that were provided by the Binder. These have already been
-	// constructed by GetInstance, or provided by the user in the Binder
-	binderInstances binderInstances
+	// constructed by GetValue, or provided by the user in the Binder
+	binderMap injectorMap
 
-	// A map of InstanceName to a Provider. Used for constructing the Instance when
-	// GetInstance is called
+	// A map of Key to a Provider. Used for constructing the Instance when
+	// GetValue is called
 	atomicProviderMap map[string]*atomicProvider
-
-	// A lock for all writes to the state stored in the injector
-	lock sync.Mutex
 
 	// A map of InstanceNames to InstanceNames that depend on them
 	dependencyMap dependencyMap
 }
 
-type dependencyMap map[string][]string
-
-func (i *injectorImpl) AddInstanceWithKey(key string, instance Instance) {
-	if instance == nil {
-		return
-	}
-	i.lock.Lock()
-	defer i.lock.Unlock()
-	i.binderInstances[key] = instance
-	i.clearInstanceDeps(key)
-}
-
-func (i *injectorImpl) AddInstance(instance Instance) {
-	if instance == nil {
-		return
-	}
-	i.lock.Lock()
-	defer i.lock.Unlock()
-	i.binderInstances[instance.GetInstanceName()] = instance
-	i.clearInstanceDeps(instance.GetInstanceName())
-}
-
-func (i *injectorImpl) AddProvider(key string, provider *Provider) {
+func (i *injectorImpl) AddProvider(key string, provider Provider) {
 	if provider == nil {
 		return
 	}
-	i.lock.Lock()
-	defer i.lock.Unlock()
-	i.atomicProviderMap[key] = &atomicProvider{
-		provider: provider,
-		once:     sync.Once{},
-	}
+	i.atomicProviderMap[key] = newAtomicProvider(provider)
 	i.clearInstanceDeps(key)
 }
 
-func (i *injectorImpl) clearInstanceDeps(instanceName string) {
-	for _, v := range i.dependencyMap[instanceName] {
-		delete(i.binderInstances, v)
+func (i *injectorImpl) GetStructPtr(key string) interface{} {
+	inst := i.Get(key)
+	if inst != nil {
+		return inst.GetStructPtr()
+	}
+	return inst
+}
+
+func (i *injectorImpl) GetBool(key string) bool {
+	inst := i.Get(key)
+	if inst == nil {
+		return false
+	}
+	return inst.GetBool()
+}
+
+func (i *injectorImpl) GetInt(key string) int {
+	inst := i.Get(key)
+	if inst == nil {
+		return 0
+	}
+	return inst.GetInt()
+}
+
+func (i *injectorImpl) GetString(key string) string {
+	inst := i.Get(key)
+	if inst == nil {
+		return ""
+	}
+	return inst.GetString()
+}
+
+func (i *injectorImpl) GetFloat32(key string) float32 {
+	inst := i.Get(key)
+	if inst == nil {
+		return 0
+	}
+	return inst.GetFloat32()
+}
+
+func (i *injectorImpl) GetFloat64(key string) float64 {
+	inst := i.Get(key)
+	if inst == nil {
+		return 0
+	}
+	return inst.GetFloat64()
+}
+
+func (i *injectorImpl) GetInt64(key string) int64 {
+	inst := i.Get(key)
+	if inst == nil {
+		return 0
+	}
+	return inst.GetInt64()
+}
+
+func (i *injectorImpl) GetInt32(key string) int32 {
+	inst := i.Get(key)
+	if inst == nil {
+		return 0
+	}
+	return inst.GetInt32()
+}
+
+type dependencyMap map[string][]string
+
+func (i *injectorImpl) Add(instanceName string, instance Instance) {
+	if instance == nil {
+		return
+	}
+	i.binderMap[instanceName] = newManagedInstance(instance, false)
+	i.clearInstanceDeps(instanceName)
+}
+
+func (i *injectorImpl) Get(key string) Instance {
+	mInst := i.binderMap[key]
+	instance := mInst.instance
+	if instance == nil {
+		ap := i.atomicProviderMap[key]
+		if ap == nil {
+			return nil
+		}
+		ap.once.Do(func() {
+			if ap.provider.GetArgs() == nil {
+				instance = ap.provider.GetFactory()(nil)
+			} else {
+				instance = ap.provider.GetFactory()(ap.provider.GetArgs())
+			}
+			if instance.GetKind() == reflect.Struct {
+				i.instantiateStructValue(key, instance)
+			}
+			i.binderMap[key] = newManagedInstance(instance, true)
+		})
+	} else if !mInst.isInstantiated && instance.GetKind() == reflect.Struct {
+		i.instantiateStructValue(key, instance)
+		i.binderMap[key] = newManagedInstance(instance, true)
+	}
+	return instance
+}
+
+func (i *injectorImpl) instantiateStructValue(key string, instance Instance) {
+	v := instance.getReflectValue().Elem()
+	for j := 0; j < v.NumField(); j++ {
+		depKey := v.Type().Field(j).Tag.Get("inject")
+		if depKey != "" {
+			depInstance := i.Get(depKey)
+			if depInstance.GetKind() == reflect.Struct || isZero(v.Field(j)) {
+				if v.Field(j).CanSet() {
+					if depInstance != nil {
+						v.Field(j).Set(reflect.ValueOf(depInstance.GetValue()))
+					}
+					i.dependencyMap[depKey] = append(i.dependencyMap[depKey], key)
+				}
+			}
+		}
+	}
+}
+
+func isZero(v reflect.Value) bool {
+	return v.Interface() == reflect.Zero(v.Type()).Interface()
+}
+
+func newAtomicProvider(provider Provider) *atomicProvider {
+	return &atomicProvider{
+		once:     sync.Once{},
+		provider: provider,
+	}
+}
+
+func (i *injectorImpl) clearInstanceDeps(key string) {
+	for _, v := range i.dependencyMap[key] {
+		delete(i.binderMap, v)
 		i.atomicProviderMap[v].once = sync.Once{}
 		i.clearInstanceDeps(v)
 	}
 }
 
-func (i *injectorImpl) GetInstance(key string) Instance {
-	instance := i.binderInstances[key]
-	if instance == nil {
-		ap := i.atomicProviderMap[key]
-		if ap == nil {
-			panic(fmt.Sprintf("unknown instance %s", key))
-		}
-		ap.once.Do(func() {
-			if ap.provider.Args == nil {
-				instance = ap.provider.Factory(nil)
-			} else {
-				instance = ap.provider.Factory(ap.provider.Args)
-			}
-			v := reflect.ValueOf(instance).Elem()
-			for j := 0; j < v.NumField(); j++ {
-				depInstanceName := v.Type().Field(j).Tag.Get("inject")
-				if depInstanceName != "" {
-					depInstance := i.GetInstance(depInstanceName)
-					if v.Field(j).CanSet() {
-						v.Field(j).Set(reflect.ValueOf(depInstance))
-						i.dependencyMap[depInstanceName] = append(i.dependencyMap[depInstanceName], ap.provider.InstanceName)
-					}
-				}
-			}
-			i.lock.Lock()
-			defer i.lock.Unlock()
-			i.binderInstances[key] = instance
-		})
-	}
-	return instance
-}
-
 func newInjector(binder Binder) Injector {
 	bi, ap, dm := hydrateInjector(binder)
 	return &injectorImpl{
-		binderInstances:   bi,
+		binderMap:         bi,
 		atomicProviderMap: ap,
-		lock:              sync.Mutex{},
 		dependencyMap:     dm,
 	}
 }
 
-func hydrateInjector(binder Binder) (binderInstances, map[string]*atomicProvider, dependencyMap) {
-	bi := make(binderInstances)
+type managedInstance struct {
+	isInstantiated bool
+	instance       Instance
+}
+
+func newManagedInstance(instance Instance, isInstantiated bool) managedInstance {
+	return managedInstance{
+		isInstantiated: isInstantiated,
+		instance:       instance,
+	}
+}
+
+type injectorMap map[string]managedInstance
+
+func hydrateInjector(binder Binder) (injectorMap, map[string]*atomicProvider, dependencyMap) {
+	bi := make(injectorMap)
 	ap := make(map[string]*atomicProvider)
 	dm := make(dependencyMap)
-	for _, v := range binder {
-		if v.Instance != nil {
-			bi[v.Instance.GetInstanceName()] = v.Instance
-		} else {
-			if v.Provider == nil {
-				panic("all binder entries must have either a Val or a InstanceFactory")
-			}
-			if v.Provider.InstanceName == "" {
-				panic("if only a provider factory is used, an InstanceName must be provided in the binder entry")
-			}
-			ap[v.Provider.InstanceName] = &atomicProvider{
-				once:     sync.Once{},
-				provider: v.Provider,
+	for _, m := range binder.Modules() {
+		for _, v := range m.Bindings() {
+			if v.GetInstance() != nil {
+				bi[v.GetKey()] = newManagedInstance(v.GetInstance(), false)
+			} else if v.GetProvider() != nil {
+				ap[v.GetKey()] = newAtomicProvider(v.GetProvider())
 			}
 		}
 	}

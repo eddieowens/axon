@@ -1,24 +1,18 @@
 package tests
 
-import "axon"
+import "github.com/eddieowens/axon"
 
 type UserService interface {
-    axon.Instance
-    GetUser() string
+	GetUser() string
 }
 
 type UserServiceImpl struct {
-
-}
-
-func (UserServiceImpl) GetInstanceName() string {
-    return "userService"
 }
 
 func (UserServiceImpl) GetUser() string {
-    return "im a user"
+	return "im a user"
 }
 
 func UserServiceFactory() axon.Instance {
-    return new(UserServiceImpl)
+	return axon.StructPtr(new(UserServiceImpl))
 }

@@ -1,16 +1,14 @@
 package tests
 
-import "axon"
+import (
+	"github.com/eddieowens/axon"
+)
 
 type MockTestService struct {
 }
 
 func TestServiceMockFactory(_ axon.Args) axon.Instance {
-	return new(MockTestService)
-}
-
-func (MockTestService) GetInstanceName() string {
-	return "testService"
+	return axon.StructPtr(new(MockTestService))
 }
 
 func (MockTestService) DoTestStuff() string {

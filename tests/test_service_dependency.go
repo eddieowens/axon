@@ -1,26 +1,27 @@
 package tests
 
-import "axon"
+import (
+	"fmt"
+	"github.com/eddieowens/axon"
+)
 
 const TestServiceDependencyInstanceName = "testServiceDependency"
 
 type TestServiceDependency interface {
-	axon.Instance
 	DoEvenMoreTestStuff() string
 }
 
 type TestServiceDependencyImpl struct {
-	DepTwo DepTwo `inject:"DepTwo"`
-}
-
-func (*TestServiceDependencyImpl) GetInstanceName() string {
-	return TestServiceDependencyInstanceName
+	DepTwo  DepTwo  `inject:"DepTwo"`
+	Int64   int64   `inject:"constantInt64"`
+	Int32   int32   `inject:"constantInt32"`
+	Float64 float64 `inject:"constantFloat64"`
 }
 
 func (t *TestServiceDependencyImpl) DoEvenMoreTestStuff() string {
-	return t.DepTwo.CallDepTwo() + " im the dependency!"
+	return t.DepTwo.CallDepTwo() + " im the dependency! " + fmt.Sprint(t.Int64) + fmt.Sprint(t.Int32) + fmt.Sprint(t.Float64)
 }
 
 func TestServiceDependencyFactory(_ axon.Args) axon.Instance {
-	return new(TestServiceDependencyImpl)
+	return axon.StructPtr(new(TestServiceDependencyImpl))
 }

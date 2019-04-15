@@ -1,21 +1,24 @@
 package tests
 
-import "axon"
+import (
+	"fmt"
+	"github.com/eddieowens/axon"
+)
 
 const DepTwoInstanceName = "DepTwo"
 
 type DepTwo interface {
-	axon.Instance
 	CallDepTwo() string
 }
 
 type DepTwoImpl struct {
+	Bool bool `inject:"constantBool"`
 }
 
-func (*DepTwoImpl) CallDepTwo() string {
-	return "dep two!"
+func (d *DepTwoImpl) CallDepTwo() string {
+	return "dep two! " + fmt.Sprint(d.Bool)
 }
 
-func (*DepTwoImpl) GetInstanceName() string {
-	return DepTwoInstanceName
+func DepTwoFactory(args axon.Args) axon.Instance {
+	return axon.StructPtr(&DepTwoImpl{Bool: args.Bool(0)})
 }

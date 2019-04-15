@@ -1,7 +1,7 @@
 package tests
 
 import (
-	. "axon"
+	. "github.com/eddieowens/axon"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -9,33 +9,30 @@ import (
 func TestNewInjector(t *testing.T) {
 	asrt := assert.New(t)
 
-	binder := []BinderEntry{
-		{
-			Provider: &Provider{
-				Factory:      TestServiceFactory,
-				InstanceName: "testService",
-				Args:         Args{"arg value", 1, float32(2.0)},
-			},
-		},
-		{
-			Provider: &Provider{
-				Factory:      TestServiceDependencyFactory,
-				InstanceName: TestServiceDependencyInstanceName,
-			},
-		},
-		{
-			Instance: new(DepTwoImpl),
-		},
-	}
+	binder := NewBinder(
+		NewModule(
+			Bind("testService").To().Factory(TestServiceFactory).WithArgs(Args{"arg value", 1, float32(2.0)}),
+			Bind("constantString").To().String("the string"),
+			Bind("constantInt").To().Int(2),
+			Bind("constantInt32").To().Int32(3),
+			Bind("constantInt64").To().Int64(4),
+			Bind("constantFloat32").To().Float32(5),
+			Bind("constantFloat64").To().Float64(6),
+			Bind("constantBool").To().Bool(true),
+			Bind(TestServiceDependencyInstanceName).To().Factory(TestServiceDependencyFactory).WithoutArgs(),
+			Bind(DepTwoInstanceName).To().Instance(StructPtr(new(DepTwoImpl))),
+		),
+	)
 
 	injector := NewInjector(binder)
 
-	asrt.Equal("dep two! im the dependency!test!", injector.GetInstance("testService").(TestService).DoTestStuff())
-	asrt.NotNil("im the dependency!", injector.GetInstance(TestServiceDependencyInstanceName).(TestServiceDependency).DoEvenMoreTestStuff())
-	asrt.Equal("arg value", injector.GetInstance("testService").(*TestServiceImpl).StringField)
-	asrt.Equal(1, injector.GetInstance("testService").(*TestServiceImpl).IntField)
-	asrt.Equal(float32(2.0), injector.GetInstance("testService").(*TestServiceImpl).Float32Field)
-	asrt.Equal(uint(0), injector.GetInstance("testService").(*TestServiceImpl).UIntField)
+	ts := injector.GetStructPtr("testService").(*TestServiceImpl)
+	asrt.Equal("dep two! true im the dependency! 436test! the string25", ts.DoTestStuff())
+	asrt.NotNil("im the dependency!", injector.GetStructPtr(TestServiceDependencyInstanceName).(TestServiceDependency).DoEvenMoreTestStuff())
+	asrt.Equal("arg value", ts.StringField)
+	asrt.Equal(1, ts.IntField)
+	asrt.Equal(float32(2.0), ts.Float32Field)
+	asrt.Equal(uint(0), ts.UIntField)
 }
 
 func TestInjectTestServiceDependencyMock(t *testing.T) {
@@ -43,9 +40,9 @@ func TestInjectTestServiceDependencyMock(t *testing.T) {
 
 	injector := createInjector()
 
-	injector.AddInstance(&MockTestServiceDependency{})
+	injector.Add(TestServiceDependencyInstanceName, StructPtr(new(MockTestServiceDependency)))
 
-	asrt.Equal("this is a mock!", injector.GetInstance(TestServiceDependencyInstanceName).(TestServiceDependency).DoEvenMoreTestStuff())
+	asrt.Equal("this is a mock!", injector.GetStructPtr(TestServiceDependencyInstanceName).(TestServiceDependency).DoEvenMoreTestStuff())
 }
 
 func TestInjectTestServiceMock(t *testing.T) {
@@ -53,56 +50,86 @@ func TestInjectTestServiceMock(t *testing.T) {
 
 	injector := createInjector()
 
-	injector.AddProvider("testService", &Provider{Factory: TestServiceMockFactory})
+	injector.AddProvider("testService", NewProvider(TestServiceMockFactory))
 
-	asrt.Equal("I'm a mock provider!", injector.GetInstance("testService").(TestService).DoTestStuff())
+	asrt.Equal("I'm a mock provider!", injector.GetStructPtr("testService").(TestService).DoTestStuff())
 }
 
-func TestMultipleAddInstance(t *testing.T) {
+func TestMultipleAdd(t *testing.T) {
 	asrt := assert.New(t)
 	injector := createInjector()
 
-	ts := injector.GetInstance("testService").(TestService)
-	asrt.Equal("dep two! im the dependency!test!", ts.DoTestStuff())
+	ts := injector.GetStructPtr("testService").(TestService)
+	asrt.Equal("dep two! true im the dependency! 436test! the string25", ts.DoTestStuff())
 
-	injector.AddInstance(new(MockTestServiceDependency))
-	injector.AddInstance(injector.GetInstance(TestServiceDependencyInstanceName))
-	injector.GetInstance("testService")
-	injector.AddInstance(new(MockTestServiceDependency))
-	mock := injector.GetInstance("testService").(TestService)
+	injector.Add(TestServiceDependencyInstanceName, StructPtr(new(MockTestServiceDependency)))
+	injector.Add(TestServiceDependencyInstanceName, injector.Get(TestServiceDependencyInstanceName))
+	injector.GetStructPtr("testService")
+	injector.Add(TestServiceDependencyInstanceName, StructPtr(new(MockTestServiceDependency)))
+	mock := injector.GetStructPtr("testService").(TestService)
 
-	asrt.Equal("this is a mock!test!", mock.DoTestStuff())
+	asrt.Equal("this is a mock!test! the string25", mock.DoTestStuff())
 }
 
-func TestAddInstance(t *testing.T) {
+func TestAdd(t *testing.T) {
 	asrt := assert.New(t)
 	injector := createInjector()
 
-	injector.GetInstance("testService")
-	injector.AddInstance(new(MockDepTwo))
-	mock := injector.GetInstance("testService").(TestService)
+	injector.GetStructPtr("testService")
+	injector.Add(DepTwoInstanceName, StructPtr(new(MockDepTwo)))
+	mock := injector.GetStructPtr("testService").(TestService)
 
-	asrt.Equal("mock dep two im the dependency!test!", mock.DoTestStuff())
+	asrt.Equal("mock dep two im the dependency! 436test! the string25", mock.DoTestStuff())
+}
+
+func TestStruct(t *testing.T) {
+	asrt := assert.New(t)
+	injector := createInjector()
+
+	injector.Add("something", StructPtr(new(TestServiceImpl)))
+	actual := injector.Get("something").GetStructPtr().(*TestServiceImpl).DoTestStuff()
+
+	asrt.Equal("dep two! true im the dependency! 436test! the string25", actual)
+}
+
+func TestConstantPrecedence(t *testing.T) {
+	asrt := assert.New(t)
+
+	type constStruct struct {
+		Int int `inject:"int"`
+	}
+
+	binder := NewBinder(
+		NewModule(
+			Bind("const").To().Factory(func(args Args) Instance {
+				return StructPtr(&constStruct{Int: args.Int(0)})
+			}).WithArgs(Args{1}),
+			Bind("int").To().Int(5),
+		),
+	)
+
+	injector := NewInjector(binder)
+
+	depTwo := injector.GetStructPtr("const").(*constStruct)
+	asrt.Equal(1, depTwo.Int)
 }
 
 func createInjector() Injector {
-	binder := []BinderEntry{
-		{
-			Provider: &Provider{
-				Factory:      TestServiceFactory,
-				InstanceName: "testService",
-			},
-		},
-		{
-			Provider: &Provider{
-				Factory:      TestServiceDependencyFactory,
-				InstanceName: TestServiceDependencyInstanceName,
-			},
-		},
-		{
-			Instance: new(DepTwoImpl),
-		},
-	}
+
+	binder := NewBinder(
+		NewModule(
+			Bind("constantString").To().String("the string"),
+			Bind("constantInt").To().Int(2),
+			Bind("constantInt32").To().Int32(3),
+			Bind("constantInt64").To().Int64(4),
+			Bind("constantFloat32").To().Float32(5),
+			Bind("constantFloat64").To().Float64(6),
+			Bind("constantBool").To().Bool(true),
+			Bind("testService").To().Factory(TestServiceFactory).WithoutArgs(),
+			Bind(TestServiceDependencyInstanceName).To().Factory(TestServiceDependencyFactory).WithoutArgs(),
+			Bind(DepTwoInstanceName).To().Instance(StructPtr(new(DepTwoImpl))),
+		),
+	)
 
 	return NewInjector(binder)
 }

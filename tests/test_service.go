@@ -1,18 +1,22 @@
 package tests
 
-import "axon"
+import (
+	"fmt"
+	"github.com/eddieowens/axon"
+)
 
 type TestService interface {
-	axon.Instance
 	DoTestStuff() string
 }
 
 type TestServiceImpl struct {
 	TestServiceDependency TestServiceDependency `inject:"testServiceDependency"`
-	SomethingElse         string
+	SomethingElse         string                `inject:"constantString"`
 	StringField           string
+	InjectedIntField      int `inject:"constantInt"`
 	IntField              int
 	Float32Field          float32
+	InjectedFloat32Field  float32 `inject:"constantFloat32"`
 	UIntField             uint
 }
 
@@ -23,13 +27,9 @@ func TestServiceFactory(args axon.Args) axon.Instance {
 		Float32Field: args.Float32(2),
 		UIntField:    args.UInt(3),
 	}
-	return &t
-}
-
-func (TestServiceImpl) GetInstanceName() string {
-	return "testService"
+	return axon.StructPtr(&t)
 }
 
 func (t TestServiceImpl) DoTestStuff() string {
-	return t.TestServiceDependency.DoEvenMoreTestStuff() + "test!"
+	return t.TestServiceDependency.DoEvenMoreTestStuff() + "test! " + t.SomethingElse + fmt.Sprint(t.InjectedIntField) + fmt.Sprint(t.InjectedFloat32Field)
 }

@@ -1,5 +1,5 @@
 # axon
-A simple, lightweight, lazy-loaded, and concurrent DI (really just a singleton management) library.
+A simple, lightweight, and lazy-loaded DI (really just a singleton management) library.
 
 ## Install
 ```bash
@@ -8,180 +8,202 @@ go get github.com/eddieowens/axon
 
 ## Usage
 ### Basic
-Define some interface with the `axon.Instance` interface embedded
-```go
-type TestService interface {
-    axon.Instance
-    DoTestStuff() string
-}
-```
-Implement the interface
-```go
-const TestServiceInstance = "testService"
-
-type TestServiceImpl struct {
-}
-
-func (*TestServiceImpl) GetInstanceName() string {
-    return TestServiceInstance
-}
-
-func (*TestServiceImpl) DoTestStuff() string {
-    return "test!"
-}
-```
-The `Instance` interface requires a single method which defines your service's referent for your 
-`Instance` in the `Injector`
-
-Instantiate the `Injector` for your app
 ```go
 package main
 
-import "github.com/eddieowens/axon"
-
-var Injector axon.Injector
+import (
+    "fmt"
+    "github.com/eddieowens/axon"
+)
 
 func main() {
-    Injector = CreateInjector()
-}
-
-func CreateInjector() axon.Injector {
-    binder := []BinderEntry{
-        {Instance: &TestServiceImpl{}},
-    }
+    binder := axon.NewBinder(axon.NewModule(
+        axon.Bind("AnswerToTheUltimateQuestion").To().Int(42),
+    ))
     
-    return axon.NewInjector(binder)
+    injector := axon.NewInjector(binder)
+    
+    fmt.Print(injector.GetInt("AnswerToTheUltimateQuestion")) // Prints 42
 }
 ```
-The `Injector` is a manager for singletons created as defined within your `Binder` which is
-just an alias for a slice of `BinderEntry`. This binder is customizable. Check out the docs to learn
-more about customizing the binder your injector manages
-
-Now get your newly created service!
-```go
-func SomethingToDoInMyApp() {
-    testService := Instance.GetInstance(TestServiceInstance).(TestService)
-    fmt.Println(testService.DoTestStuff()) // Prints "test!"
-}
-```
+In the above, I created a new `Binder` by passing in a `Module` which stores my int value (42). A `Binder` is a series
+of `Modules` and these `Modules` allow you to define what is stored in the `Injector` at runtime. You define a `Module` by
+using different `Bindings`. In this case, we bound the `key` _AnswerToTheUltimateQuestion_ to the int value 42. Now on all subsequent
+`injector.GetInt("AnswerToTheUltimateQuestion")` calls, 42 will be returned.
 ### Injecting dependencies
-Let's say you have another service which requires the previously created `TestService` so you create a struct
-that looks something like this
-```go
-type HigherLevelService struct {
-    TestService TestService
-}
-```
-This is perfectly valid Go and with a single dependency this isn't too bad. Although, you still have to manage the
-singletons of `HigherLevelService` and `TestServiceImpl` unless you want to create them each time which is 
-inefficient. And what if you need more than one or two dependencies? This can get messy and bug prone fast.
-
-Rather than managing the entire dependency graph yourself, `axon` can do that for you
-```go
-type HigherLevelService interface {
-    axon.Instance
-    DoSomething() string
-}
-
-type HigherLevelServiceImpl struct {
-    TestService TestService `inject:"testService"` // The instance name of TestService
-}
-
-func (*HigherLevelServiceImpl) GetInstanceName() string {
-    return "higherLevelService"
-} 
-
-type (*HigherLevelServiceImpl) DoSomething() string {
-    return "I'm doing something!"
-} 
-
-// The factory that is used within a Provider in a Binder. This factory will be called 
-// when injector.GetInstance("higherLevelService") is called and a ptr to a HigherLevelServiceImpl
-// will be returned
-func HigherLevelServiceFactory(args axon.Args) axon.Instance {
-    return new(HigherLevelServiceImpl)
-}
-```
-Now add both the `HigherLevelService` and the `TestService` to your `Binder`
+Now the above isn't very interesting on its own but what if you wanted to pass in the `AnswerToTheUltimateQuestion` value to everything that
+depended on it? It would be tedious to create a global variable and pass that along wherever you needed it. Instead,
+you can `inject` it as a dependency.
 ```go
 package main
 
-import "github.com/eddieowens/axon"
-
-var Injector axon.Injector
+import (
+    "fmt"
+    "github.com/eddieowens/axon"
+)
 
 func main() {
-    Injector = CreateInjector()
-}
-
-func CreateInjector() axon.Injector {
-    binder := []BinderEntry{
-        {
-            Provider: &Provider{
-                Factory:      HigherLevelServiceFactory,
-                InstanceName: "higherLevelService", // The instance name must be given when using a Provider in a BinderEntry
-            },
-        },
-        {
-            Instance: &TestServiceImpl{},
-        },
+    type MyStruct struct {
+        IntField int `inject:"AnswerToTheUltimateQuestion"`
     }
     
-    return axon.NewInjector(binder)
-}
-```
-Now whenever you call 
-```go
-hls := Injector.GetInstance("higherLevelService").(HigherLevelService)
-```
-The `HigherLevelServiceImpl` will be returned with a `TestServiceImpl` automatically injected via the `inject` tag
-into its `TestService` field. This allows for a nice decoupling between your structs and their dependencies.
-
-### In tests
-In order to mock the `TestService` within a test, define your mock
-```go
-type TestServiceMock struct {
-}
-
-func (*TestServiceMock) GetInstanceName() string {
-    return TestServiceInstance
-}
-
-func (*TestServiceMock) DoTestStuff() string {
-    return "I'm a mock!"
-}
-```
-Create the injector and override the `TestServiceImpl` instance with your mock
-```go
-func TestHigherLevelServiceImpl(t *testing.T) {
-    injector := CreateInjector() // don't worry, this call is incredibly light even for very large binders
-    injector.AddInstance(&TestServiceMock{})
-}
-```
-Now wherever `injector.GetInstance("testService")` is called, the mock will be returned. This is useful for
-testing code that depends on `TestService` like `HigherLevelService` from the previous section
-```go
-func TestHigherLevelServiceImpl(t *testing.T) {
-    injector := CreateInjector()
-    injector.AddInstance(&TestServiceMock{})
+    binder := axon.NewBinder(axon.NewModule(
+        axon.Bind("MyStruct").To().Instance(axon.StructPtr(new(MyStruct))),
+        axon.Bind("AnswerToTheUltimateQuestion").To().Int(42),
+    ))
     
-    // Grab the HigherLevelServiceImpl to test it with a mock TestService
-    hls := injector.GetInstance("higherLevelService").(*HigherLevelServiceImpl)
+    injector := axon.NewInjector(binder)
     
-    // Test the HigherLevelServiceImpl
+    fmt.Print(injector.GetStructPtr("MyStruct").(*MyStruct).IntField) // Prints 42
+}
+
+```
+Now, you have a struct called `MyStruct` which is bound to the `key` _MyStruct_ as an `Instance`. An `Instance` is the
+wrapper that `axon` uses around everything it manages. It holds metadata and allows the `injector` to interact with 
+everything you've defined in your `Binder` efficiently and safely. All interactions between your raw data and the 
+`injector` will be done via an `Instance`.
+
+You may have also noticed the `inject` tag. Well this is how `axon` delivers your dependencies to your struct at
+runtime and allows you to not have to worry about creating it yourself. The `inject` tag takes a single string value
+which is the `key` you defined within your `Module` and will automatically pass the value in on a call to 
+`injector.GetStructPtr("MyStruct")`.
+
+### Utilizing interfaces
+In the above example, you have to write quite a bit of code to do something that could be done pretty succinctly
+in just raw go. Admittedly, `axon` does not shine when injecting simple constants (although it does make managing them
+far easier). Where `axon` really shines is injecting deep dependency trees and using interfaces.
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/eddieowens/axon"
+)
+
+type Starter interface {
+    Start()
+}
+
+type Car struct {
+    Engine Starter `inject:"Engine"`
+}
+
+func (c *Car) Start() {
+    fmt.Println("Starting the Car!")
+    c.Engine.Start()
+}
+
+type Engine struct {
+    FuelInjector Starter `inject:"FuelInjector"`
+}
+
+func (e *Engine) Start() {
+    fmt.Println("Starting the Engine!")
+    e.FuelInjector.Start()
+}
+
+type FuelInjector struct {
+}
+
+func (*FuelInjector) Start() {
+    fmt.Println("Starting the FuelInjector!")
+}
+
+func CarFactory(_ axon.Args) axon.Instance {
+    fmt.Println("Hey, a new Car is being made!")
+    return axon.StructPtr(new(Car))
+}
+
+func main() {
+    binder := axon.NewBinder(axon.NewModule(
+        axon.Bind("Car").To().Factory(CarFactory).WithoutArgs(),
+        axon.Bind("Engine").To().Instance(axon.StructPtr(new(Engine))),
+        axon.Bind("FuelInjector").To().Instance(axon.StructPtr(new(FuelInjector))),
+    ))
+    
+    injector := axon.NewInjector(binder)
+    
+    // Prints:
+    // Hey, a new Car is being made!
+    // Starting the Car!
+    // Starting the Engine!
+    // Starting the FuelInjector!
+    injector.GetStructPtr("Car").(Starter).Start()
+}
+
+```
+Here we have a `Car` which depends on an `Engine` which depends on a `FuelInjector`. Things are getting a bit messy
+and managing all of these structs is becoming tedious and cumbersome. Rather than managing everything ourselves, `axon`
+can manage these dependencies for us. Now whenever you call the `Start()` function on the `Car`, all of the required 
+dependencies will be automatically added and this will be consistent throughout your codebase.
+
+### Factories
+The above also introduces the use of a `Factory` to create an `Instance`. You use a `Factory` when you want the
+construction of your `Instance` to be managed by `axon`. For instance, let's say you require some parameters for
+your `Car` that aren't provided until runtime and aren't managed by `axon`.
+```go
+...
+type Car struct {
+    LockCode string
+}
+
+func CarFactory(args axon.Args) axon.Instance {
+    return &Car{
+        LockCode: args.String(0),
+    }
+}
+...
+binder := axon.NewBinder(axon.NewModule(
+    axon.Bind("Car").To().Factory(CarFactory).WithArgs(axon.Args{os.Getenv("CAR_LOCK_CODE")}),
     ...
+))
+
+injector := axon.NewInjector(binder)
+
+car := injector.GetStructPtr("Car").(*Car)
+fmt.Println(car.LockCode) // Prints the value of env var CAR_LOCK_CODE
+```
+FYI, if the `Arg` passed into your `Instance` is overriding a field that is tagged with `inject`, the arg will
+always take precedence and will not be overwritten. 
+### Testing
+What I think to be the most useful functionality that `axon` affords you is the ability to very easily and precisely
+test your code. Let's say you create a test for your `Engine`. You don't want to also
+test the functionality of the `FuelInjector` so you make a mock of the `Starter` interface.
+```go
+import (
+    "fmt"
+    "github.com/stretchr/testify/mock"
+    "testing"
+)
+
+type MockFuelInjector struct {
+    mock.Mock
+}
+
+func (m *MockFuelInjector) Start() {
+    fmt.Println("I'm a mock FuelInjector!")
 }
 ```
+Then you add it to the `Injector` within your test.
+```go
+func TestEngine(t *testing.T) {
+    injector := axon.NewInjector(binder)
+	
+    injector.Add("FuelInjector", axon.StructPtr(new(MockFuelInjector)))
+    
+    // Prints:
+    // Starting the Engine!
+    // I'm a mock FuelInjector!
+    injector.GetStructPtr("Engine").(Starter).Start()
+}
+```
+The `injector.Add()` method will replace the `Instance` held by the `key` with the mocked `FuelInjector` allowing you
+to unit test your code efficiently and exactly.
 
-## Why should I use this?
-Many dependency injection frameworks out there use quite a bit of heavy and brittle reflection to achieve 
-the desired state. Axon is simply a singleton manager which eliminates a lot of boiler plate and error prone
-code (especially around [concurrency](http://marcio.io/2015/07/singleton-pattern-in-go/)). It uses very little 
-reflection, lazy-loads dependencies, and is safe to use in multiple goroutines. It's also very easy to override 
-instances within the injector with a mock for easy testing.
-
-In short, it makes managing a GoLang codebase a bit easier.
-
+To note, the `Injector` keeps track of every `Instance`'s dependencies and will clear the dependencies of a particular
+`key` when the `Add()` method is called. This means all subsequent `injector.Get()` method calls will return the
+correct `Instance`. For example, if you call `injector.Get("Car")` in the above test, it will store an `Engine` which
+will store a `MockFuelInjector`.
 ## [Docs](https://godoc.org/github.com/eddieowens/axon)
 
 ## License
