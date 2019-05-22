@@ -1,6 +1,7 @@
 package axon
 
 import (
+	"fmt"
 	"reflect"
 	"sync"
 )
@@ -188,11 +189,12 @@ func (i *injectorImpl) instantiateStructValue(key string, instance Instance) {
 		depKey := v.Type().Field(j).Tag.Get("inject")
 		if depKey != "" {
 			depInstance := i.Get(depKey)
+			if depInstance == nil {
+				panic(fmt.Sprintf("failed to inject %s into %s as it was not created.", depKey, v.String()))
+			}
 			if depInstance.GetKind() == reflect.Struct || isZero(v.Field(j)) {
 				if v.Field(j).CanSet() {
-					if depInstance != nil {
-						v.Field(j).Set(reflect.ValueOf(depInstance.GetValue()))
-					}
+					v.Field(j).Set(reflect.ValueOf(depInstance.GetValue()))
 					i.dependencyMap[depKey] = append(i.dependencyMap[depKey], key)
 				}
 			}
