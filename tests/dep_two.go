@@ -19,6 +19,6 @@ func (d *DepTwoImpl) CallDepTwo() string {
 	return "dep two! " + fmt.Sprint(d.Bool)
 }
 
-func DepTwoFactory(args axon.Args) axon.Instance {
+func DepTwoFactory(_ axon.Injector, args axon.Args) axon.Instance {
 	return axon.StructPtr(&DepTwoImpl{Bool: args.Bool(0)})
 }

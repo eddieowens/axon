@@ -7,7 +7,7 @@ import (
 type MockTestService struct {
 }
 
-func TestServiceMockFactory(_ axon.Args) axon.Instance {
+func TestServiceMockFactory(_ axon.Injector, _ axon.Args) axon.Instance {
 	return axon.StructPtr(new(MockTestService))
 }
 

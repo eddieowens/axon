@@ -5,8 +5,9 @@ import (
 )
 
 // Function that constructs an Instance. The args field are provided via the Provider listed
-// within a Binding.
-type Factory func(args Args) Instance
+// within a Binding. The Injector provided is the state of the Injector at the time of calling
+// the factory. This should be used carefully as a user can end up in an infinite loop
+type Factory func(inj Injector, args Args) Instance
 
 // Args that are passed into a Factory upon creation (call to injector.Get*(...)). These Args will take precedence over
 // any and all other entities managed by axon. For instance, if you have a field that is tagged with inject, and is

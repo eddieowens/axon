@@ -20,7 +20,7 @@ type TestServiceImpl struct {
 	UIntField             uint
 }
 
-func TestServiceFactory(args axon.Args) axon.Instance {
+func TestServiceFactory(_ axon.Injector, args axon.Args) axon.Instance {
 	t := TestServiceImpl{
 		StringField:  args.String(0),
 		IntField:     args.Int(1),

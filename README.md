@@ -110,7 +110,7 @@ func (*FuelInjector) Start() {
     fmt.Println("Starting the FuelInjector!")
 }
 
-func CarFactory(_ axon.Args) axon.Instance {
+func CarFactory(_ axon.Injector, _ axon.Args) axon.Instance {
     fmt.Println("Hey, a new Car is being made!")
     return axon.StructPtr(new(Car))
 }
@@ -148,7 +148,7 @@ type Car struct {
     LockCode string
 }
 
-func CarFactory(args axon.Args) axon.Instance {
+func CarFactory(_ axon.Injector, args axon.Args) axon.Instance {
     return &Car{
         LockCode: args.String(0),
     }

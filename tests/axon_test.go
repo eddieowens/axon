@@ -101,7 +101,7 @@ func TestConstantPrecedence(t *testing.T) {
 
 	binder := NewBinder(
 		NewModule(
-			Bind("const").To().Factory(func(args Args) Instance {
+			Bind("const").To().Factory(func(_ Injector, args Args) Instance {
 				return StructPtr(&constStruct{Int: args.Int(0)})
 			}).WithArgs(Args{1}),
 			Bind("int").To().Int(5),

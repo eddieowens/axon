@@ -22,6 +22,8 @@ func (t *TestServiceDependencyImpl) DoEvenMoreTestStuff() string {
 	return t.DepTwo.CallDepTwo() + " im the dependency! " + fmt.Sprint(t.Int64) + fmt.Sprint(t.Int32) + fmt.Sprint(t.Float64)
 }
 
-func TestServiceDependencyFactory(_ axon.Args) axon.Instance {
-	return axon.StructPtr(new(TestServiceDependencyImpl))
+func TestServiceDependencyFactory(inj axon.Injector, _ axon.Args) axon.Instance {
+	t := new(TestServiceDependencyImpl)
+	t.DepTwo = inj.GetStructPtr("DepTwo").(DepTwo)
+	return axon.StructPtr(t)
 }

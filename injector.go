@@ -167,9 +167,9 @@ func (i *injectorImpl) Get(key string) Instance {
 		}
 		ap.once.Do(func() {
 			if ap.provider.GetArgs() == nil {
-				instance = ap.provider.GetFactory()(nil)
+				instance = ap.provider.GetFactory()(i, nil)
 			} else {
-				instance = ap.provider.GetFactory()(ap.provider.GetArgs())
+				instance = ap.provider.GetFactory()(i, ap.provider.GetArgs())
 			}
 			if instance.GetKind() == reflect.Struct {
 				i.instantiateStructValue(key, instance)
