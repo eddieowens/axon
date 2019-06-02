@@ -210,4 +210,4 @@ will store a `MockFuelInjector`.
 ## [Docs](https://godoc.org/github.com/eddieowens/axon)
 
 ## License
-[MIT](https://github.com/eddieowens/axon/blob/master/LICENSE)
+[Apache](https://github.com/eddieowens/axon/blob/master/LICENSE)
