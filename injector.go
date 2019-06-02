@@ -188,16 +188,16 @@ func (i *injectorImpl) instantiateStructValue(key string, instance Instance) {
 	for j := 0; j < v.NumField(); j++ {
 		depKey := v.Type().Field(j).Tag.Get("inject")
 		if depKey != "" {
-			depInstance := i.Get(depKey)
-			if depInstance == nil {
-				panic(fmt.Sprintf("failed to inject %s into %s as it was not created.", depKey, v.String()))
-			}
-			if depInstance.GetKind() == reflect.Struct || isZero(v.Field(j)) {
+			if isZero(v.Field(j)) {
+				depInstance := i.Get(depKey)
+				if depInstance == nil {
+					panic(fmt.Sprintf("failed to inject %s into %s as it was not created.", depKey, v.String()))
+				}
 				if v.Field(j).CanSet() {
 					v.Field(j).Set(reflect.ValueOf(depInstance.GetValue()))
-					i.dependencyMap[depKey] = append(i.dependencyMap[depKey], key)
 				}
 			}
+			i.dependencyMap[depKey] = append(i.dependencyMap[depKey], key)
 		}
 	}
 }
@@ -248,7 +248,7 @@ func hydrateInjector(binder Binder) (injectorMap, map[string]*atomicProvider, de
 	bi := make(injectorMap)
 	ap := make(map[string]*atomicProvider)
 	dm := make(dependencyMap)
-	for _, m := range binder.Modules() {
+	for _, m := range binder.Packages() {
 		for _, v := range m.Bindings() {
 			if v.GetInstance() != nil {
 				bi[v.GetKey()] = newManagedInstance(v.GetInstance(), false)

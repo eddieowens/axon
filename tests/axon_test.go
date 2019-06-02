@@ -10,7 +10,7 @@ func TestNewInjector(t *testing.T) {
 	asrt := assert.New(t)
 
 	binder := NewBinder(
-		NewModule(
+		NewPackage(
 			Bind("testService").To().Factory(TestServiceFactory).WithArgs(Args{"arg value", 1, float32(2.0)}),
 			Bind("constantString").To().String("the string"),
 			Bind("constantInt").To().Int(2),
@@ -100,7 +100,7 @@ func TestConstantPrecedence(t *testing.T) {
 	}
 
 	binder := NewBinder(
-		NewModule(
+		NewPackage(
 			Bind("const").To().Factory(func(_ Injector, args Args) Instance {
 				return StructPtr(&constStruct{Int: args.Int(0)})
 			}).WithArgs(Args{1}),
@@ -117,7 +117,7 @@ func TestConstantPrecedence(t *testing.T) {
 func createInjector() Injector {
 
 	binder := NewBinder(
-		NewModule(
+		NewPackage(
 			Bind("constantString").To().String("the string"),
 			Bind("constantInt").To().Int(2),
 			Bind("constantInt32").To().Int32(3),

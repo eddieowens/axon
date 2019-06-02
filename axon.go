@@ -2,7 +2,7 @@
 package axon
 
 // Creates and instantiates an Injector via a Binder provided by the user.
-//   binder := axon.NewBinder(axon.NewModule(
+//   binder := axon.NewBinder(axon.NewPackage(
 //     axon.Bind("Car").To().Factory(CarFactory).WithoutArgs()),
 //     axon.Bind("Engine").To().Instance(axon.StructPtr(new(EngineImpl)),
 //     axon.Bind("LockCode").To().String(os.Getenv("LOCK_CODE")),

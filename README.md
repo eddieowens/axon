@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-    binder := axon.NewBinder(axon.NewModule(
+    binder := axon.NewBinder(axon.NewPackage(
         axon.Bind("AnswerToTheUltimateQuestion").To().Int(42),
     ))
     
@@ -27,8 +27,8 @@ func main() {
     fmt.Print(injector.GetInt("AnswerToTheUltimateQuestion")) // Prints 42
 }
 ```
-In the above, I created a new `Binder` by passing in a `Module` which stores my int value (42). A `Binder` is a series
-of `Modules` and these `Modules` allow you to define what is stored in the `Injector` at runtime. You define a `Module` by
+In the above, I created a new `Binder` by passing in a `Package` which stores my int value (42). A `Binder` is a series
+of `Packages` and these `Packages` allow you to define what is stored in the `Injector` at runtime. You define a `Package` by
 using different `Bindings`. In this case, we bound the `key` _AnswerToTheUltimateQuestion_ to the int value 42. Now on all subsequent
 `injector.GetInt("AnswerToTheUltimateQuestion")` calls, 42 will be returned.
 ### Injecting dependencies
@@ -48,7 +48,7 @@ func main() {
         IntField int `inject:"AnswerToTheUltimateQuestion"`
     }
     
-    binder := axon.NewBinder(axon.NewModule(
+    binder := axon.NewBinder(axon.NewPackage(
         axon.Bind("MyStruct").To().Instance(axon.StructPtr(new(MyStruct))),
         axon.Bind("AnswerToTheUltimateQuestion").To().Int(42),
     ))
@@ -66,7 +66,7 @@ everything you've defined in your `Binder` efficiently and safely. All interacti
 
 You may have also noticed the `inject` tag. Well this is how `axon` delivers your dependencies to your struct at
 runtime and allows you to not have to worry about creating it yourself. The `inject` tag takes a single string value
-which is the `key` you defined within your `Module` and will automatically pass the value in on a call to 
+which is the `key` you defined within your `Package` and will automatically pass the value in on a call to 
 `injector.GetStructPtr("MyStruct")`.
 
 ### Utilizing interfaces
@@ -116,7 +116,7 @@ func CarFactory(_ axon.Injector, _ axon.Args) axon.Instance {
 }
 
 func main() {
-    binder := axon.NewBinder(axon.NewModule(
+    binder := axon.NewBinder(axon.NewPackage(
         axon.Bind("Car").To().Factory(CarFactory).WithoutArgs(),
         axon.Bind("Engine").To().Instance(axon.StructPtr(new(Engine))),
         axon.Bind("FuelInjector").To().Instance(axon.StructPtr(new(FuelInjector))),
@@ -154,7 +154,7 @@ func CarFactory(_ axon.Injector, args axon.Args) axon.Instance {
     }
 }
 ...
-binder := axon.NewBinder(axon.NewModule(
+binder := axon.NewBinder(axon.NewPackage(
     axon.Bind("Car").To().Factory(CarFactory).WithArgs(axon.Args{os.Getenv("CAR_LOCK_CODE")}),
     ...
 ))

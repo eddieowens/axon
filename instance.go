@@ -61,13 +61,13 @@ func Int(instance int) Instance {
 // An Instance of a struct ptr type. This type MUST be a ptr to a struct value.
 // If it is not, a panic will occur.
 // Good:
-//   func MyStructFactory(_ axon.Args) instance.Instance {
-//     instance.StructPtr(new(MyStruct))
+//   func MyStructFactory(_ axon.Injector, _ axon.Args) axon.Instance {
+//     return axon.StructPtr(new(MyStruct))
 //   }
 //
 // Bad:
-//   func MyStructFactory(_ axon.Args) instance.Instance {
-//     instance.StructPtr(MyStruct{})
+//   func MyStructFactory(_ axon.Injector, _ axon.Args) axon.Instance {
+//     return axon.StructPtr(MyStruct{})
 //   }
 //
 // Will be stored within the Injector simply as &MyStruct{}

@@ -14,7 +14,7 @@ type Factory func(inj Injector, args Args) Instance
 // also instantiated via Args passed in a Factory, the value provided by the Arg will always remain.
 //
 // Add Args through a Binding like so.
-//   axon.NewModule(axon.Bind("MyService").To().Factory(MyServiceFactory).WithArgs(axon.Args{"arg1"})
+//   axon.NewPackage(axon.Bind("MyService").To().Factory(MyServiceFactory).WithArgs(axon.Args{"arg1"})
 //
 // And access Args within a Factory like so.
 //    func MyServiceFactory(args axon.Args) axon.Instance {
@@ -108,27 +108,27 @@ func (f Args) Any(idx int) (val interface{}) {
 	return
 }
 
-// A collection of Modules. The Binder is the top-level definition of what the Injector will store and how it will store
-// it. The Bindings provided by this Binder's Modules will not be evaluated until an injector.Get*(string) method is
+// A collection of Packages. The Binder is the top-level definition of what the Injector will store and how it will store
+// it. The Bindings provided by this Binder's Packages will not be evaluated until an injector.Get*(string) method is
 // called.
 type Binder interface {
-	// The slice of Modules that this Binder stores.
-	Modules() []Module
+	// The slice of Packages that this Binder stores.
+	Packages() []Package
 }
 
 type binderImpl struct {
-	modules []Module
+	packages []Package
 }
 
-func (b *binderImpl) Modules() []Module {
-	return b.modules
+func (b *binderImpl) Packages() []Package {
+	return b.packages
 }
 
-// Create a new Binder from a series of Modules. If no Modules are passed in, the Injector will essentially have no
+// Create a new Binder from a series of Packages. If no Packages are passed in, the Injector will essentially have no
 // Bindings defined and will be functionally useless but no error will be returned.
-//  axon.NewBinder(axon.NewModule(...), axon.NewModule(...))
-func NewBinder(modules ...Module) Binder {
-	return &binderImpl{modules: modules}
+//  axon.NewBinder(axon.NewPackage(...), axon.NewPackage(...))
+func NewBinder(packages ...Package) Binder {
+	return &binderImpl{packages: packages}
 }
 
 type atomicProvider struct {

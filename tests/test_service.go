@@ -12,11 +12,11 @@ type TestService interface {
 type TestServiceImpl struct {
 	TestServiceDependency TestServiceDependency `inject:"testServiceDependency"`
 	SomethingElse         string                `inject:"constantString"`
+	InjectedIntField      int                   `inject:"constantInt"`
+	InjectedFloat32Field  float32               `inject:"constantFloat32"`
 	StringField           string
-	InjectedIntField      int `inject:"constantInt"`
 	IntField              int
 	Float32Field          float32
-	InjectedFloat32Field  float32 `inject:"constantFloat32"`
 	UIntField             uint
 }
 

@@ -28,6 +28,9 @@ type ConstantBindingBuilder interface {
 
 	// Binds the provided Key to a bool value.
 	Bool(b bool) Binding
+
+	// Binds the provided Key to a bool value.
+	StructPtr(s interface{}) Binding
 }
 
 // Builder for a binding to an Injectable Entity (an Instance or a Provider).
@@ -73,8 +76,8 @@ type Binding interface {
 	GetKey() string
 }
 
-// Defines a Binding in a Module from a specified key to an Instance or a Provider.
-//  axon.NewBinder(axon.NewModule(
+// Defines a Binding in a Package from a specified key to an Instance or a Provider.
+//  axon.NewBinder(axon.NewPackage(
 //      axon.Bind("UserService").To().Instance(axon.StructPtr(new(UserService))),
 //      axon.Bind("MyString").To().String("hello world"),
 //      axon.Bind("DB").To().Factory(DBFactory).WithoutArgs(),
@@ -86,37 +89,37 @@ func Bind(key string) BindingBuilder {
 	return &m
 }
 
-// Creates a new Module to pass into your Binder. You can also define a Module as a struct
-// by implementing the Module interface like so
-//   type ConfigModule struct {
+// Creates a new Package to pass into your Binder. You can also define a Package as a struct
+// by implementing the Package interface like so
+//   type ConfigPackage struct {
 //   }
 //
-//   type ConfigModule struct {
+//   type ConfigPackage struct {
 //   }
 //
-//   func (*ConfigModule) Entries() []Binding {
+//   func (*ConfigPackage) Entries() []Binding {
 //  	 return []Binding{
 //       Bind("Dev").To().Factory(TestServiceFactory).WithoutArgs(),
 //     }
 //   }
 //   ...
-//   axon.NewBinder(new(ConfigModule), ...)
-func NewModule(moduleEntries ...Binding) Module {
-	return &moduleImpl{entries: moduleEntries}
+//   axon.NewBinder(new(ConfigPackage), ...)
+func NewPackage(packageBindings ...Binding) Package {
+	return &packageImpl{entries: packageBindings}
 }
 
-// A group of Bindings that are conceptually tied together. A Module only serves as a way to separate Binding
-// definitions into different conceptual chunks. A Module does not provide any functional difference within the Injector
-type Module interface {
-	// Returns all of the Bindings that this Module stores.
+// A group of Bindings that are conceptually tied together. A Package only serves as a way to separate Binding
+// definitions into different conceptual chunks. A Package does not provide any functional difference within the Injector
+type Package interface {
+	// Returns all of the Bindings that this Package stores.
 	Bindings() []Binding
 }
 
-type moduleImpl struct {
+type packageImpl struct {
 	entries []Binding
 }
 
-func (m *moduleImpl) Bindings() []Binding {
+func (m *packageImpl) Bindings() []Binding {
 	return m.entries
 }
 
@@ -151,13 +154,13 @@ func (m *bindingBuilderImpl) To() InjectableEntityBindingBuilder {
 	return &injectableEntityBindingBuilderImpl{key: m.key}
 }
 
-type moduleEntryBuilderImpl struct {
+type packageEntryBuilderImpl struct {
 	key     string
 	factory Factory
 }
 
-func (m *moduleEntryBuilderImpl) WithArgs(args Args) Binding {
-	return &moduleEntryImpl{
+func (m *packageEntryBuilderImpl) WithArgs(args Args) Binding {
+	return &packageEntryImpl{
 		Key: m.key,
 		Provider: &providerImpl{
 			args:    args,
@@ -166,8 +169,8 @@ func (m *moduleEntryBuilderImpl) WithArgs(args Args) Binding {
 	}
 }
 
-func (m *moduleEntryBuilderImpl) WithoutArgs() Binding {
-	return &moduleEntryImpl{
+func (m *packageEntryBuilderImpl) WithoutArgs() Binding {
+	return &packageEntryImpl{
 		Key: m.key,
 		Provider: &providerImpl{
 			factory: m.factory,
@@ -179,78 +182,82 @@ type injectableEntityBindingBuilderImpl struct {
 	key string
 }
 
+func (m *injectableEntityBindingBuilderImpl) StructPtr(s interface{}) Binding {
+	return &packageEntryImpl{Instance: StructPtr(s), Key: m.key}
+}
+
 func (m *injectableEntityBindingBuilderImpl) Instance(instance Instance) Binding {
-	return &moduleEntryImpl{Instance: instance, Key: m.key}
+	return &packageEntryImpl{Instance: instance, Key: m.key}
 }
 
 func (m *injectableEntityBindingBuilderImpl) Factory(factory Factory) FactoryArgsBindingBuilder {
-	return &moduleEntryBuilderImpl{key: m.key, factory: factory}
+	return &packageEntryBuilderImpl{key: m.key, factory: factory}
 }
 
 func (m *injectableEntityBindingBuilderImpl) String(s string) Binding {
-	return &moduleEntryImpl{
+	return &packageEntryImpl{
 		Key:      m.key,
 		Instance: String(s),
 	}
 }
 
 func (m *injectableEntityBindingBuilderImpl) Int(i int) Binding {
-	return &moduleEntryImpl{
+	return &packageEntryImpl{
 		Key:      m.key,
 		Instance: Int(i),
 	}
 }
 
 func (m *injectableEntityBindingBuilderImpl) Int32(i int32) Binding {
-	return &moduleEntryImpl{
+	return &packageEntryImpl{
 		Key:      m.key,
 		Instance: Int32(i),
 	}
 }
 
 func (m *injectableEntityBindingBuilderImpl) Int64(i int64) Binding {
-	return &moduleEntryImpl{
+	return &packageEntryImpl{
 		Key:      m.key,
 		Instance: Int64(i),
 	}
 }
 
 func (m *injectableEntityBindingBuilderImpl) Float32(f float32) Binding {
-	return &moduleEntryImpl{
+	return &packageEntryImpl{
 		Key:      m.key,
 		Instance: Float32(f),
 	}
 }
 
 func (m *injectableEntityBindingBuilderImpl) Float64(f float64) Binding {
-	return &moduleEntryImpl{
+	return &packageEntryImpl{
 		Key:      m.key,
 		Instance: Float64(f),
 	}
 }
 
 func (m *injectableEntityBindingBuilderImpl) Bool(b bool) Binding {
-	return &moduleEntryImpl{
+	return &packageEntryImpl{
 		Key:      m.key,
 		Instance: Bool(b),
 	}
 }
 
-type moduleEntryImpl struct {
+type packageEntryImpl struct {
 	Provider Provider
 	Instance Instance
 	Key      string
 }
 
-func (m *moduleEntryImpl) GetKey() string {
+func (m *packageEntryImpl) GetKey() string {
 	return m.Key
 }
 
-func (m *moduleEntryImpl) GetProvider() Provider {
+func (m *packageEntryImpl) GetProvider() Provider {
 	return m.Provider
 }
 
-func (m *moduleEntryImpl) GetInstance() Instance {
+func (m *packageEntryImpl) GetInstance() Instance {
 	return m.Instance
 }
 
