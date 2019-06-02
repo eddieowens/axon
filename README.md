@@ -1,4 +1,6 @@
 # axon
+[![Go Report Card](https://goreportcard.com/badge/github.com/eddieowens/axon)](https://goreportcard.com/report/github.com/eddieowens/axon)
+
 A simple, lightweight, and lazy-loaded DI (really just a singleton management) library influenced by multiple DI 
 libraries but more specifically Google's [Guice](https://github.com/google/guice).
 
