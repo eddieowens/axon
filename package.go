@@ -29,8 +29,11 @@ type ConstantBindingBuilder interface {
 	// Binds the provided Key to a bool value.
 	Bool(b bool) Binding
 
-	// Binds the provided Key to a bool value.
+	// Binds the provided Key to a ptr to a struct value.
 	StructPtr(s interface{}) Binding
+
+	// Binds the provided Key to the value that is passed in.
+	Any(s interface{}) Binding
 }
 
 // Builder for a binding to an Injectable Entity (an Instance or a Provider).
@@ -180,6 +183,10 @@ func (m *packageEntryBuilderImpl) WithoutArgs() Binding {
 
 type injectableEntityBindingBuilderImpl struct {
 	key string
+}
+
+func (m *injectableEntityBindingBuilderImpl) Any(s interface{}) Binding {
+	return &packageEntryImpl{Instance: Any(s), Key: m.key}
 }
 
 func (m *injectableEntityBindingBuilderImpl) StructPtr(s interface{}) Binding {

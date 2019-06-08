@@ -46,6 +46,31 @@ func (i *InjectorTest) TestPropagatedInjection() {
 	i.NotNil(car)
 }
 
+func (i *InjectorTest) TestInjectSlice() {
+	// -- Given
+	//
+	type SliceInjected struct {
+		Slice []string `inject:"Slice"`
+	}
+
+	binder := axon.NewBinder(
+		axon.NewPackage(
+			axon.Bind("Slice").To().Any([]string{"val1", "val2"}),
+			axon.Bind("SliceInjected").To().StructPtr(new(SliceInjected)),
+		),
+	)
+
+	inj := axon.NewInjector(binder)
+
+	// -- When
+	//
+	sl := inj.GetStructPtr("SliceInjected").(*SliceInjected)
+
+	// -- Then
+	//
+	i.ElementsMatch(sl.Slice, []string{"val1", "val2"})
+}
+
 func TestInjectorTest(t *testing.T) {
 	suite.Run(t, new(InjectorTest))
 }
