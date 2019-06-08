@@ -203,7 +203,6 @@ func (i *injectorImpl) instantiateStructValue(key string, instance Instance) {
 }
 
 func isZero(v reflect.Value) bool {
-	fmt.Println(v.Kind())
 	switch v.Kind() {
 	case reflect.Array, reflect.String:
 		return v.Len() == 0
