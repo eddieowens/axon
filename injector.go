@@ -73,6 +73,8 @@ type injectorImpl struct {
 
 	// A map of InstanceNames to InstanceNames that depend on them
 	dependencyMap dependencyMap
+
+	keysMap keysMap
 }
 
 func (i *injectorImpl) AddProvider(key string, provider Provider) {
@@ -163,7 +165,18 @@ func (i *injectorImpl) Get(key string) Instance {
 	if instance == nil {
 		ap := i.atomicProviderMap[key]
 		if ap == nil {
-			return nil
+			keys := i.keysMap[key]
+			if keys == nil {
+				return nil
+			}
+			instances := make([]Instance, 0)
+			for _, k := range keys {
+				inst := i.Get(k)
+				if inst != nil {
+					instances = append(instances, inst)
+				}
+			}
+			return Any(instances)
 		}
 		ap.once.Do(func() {
 			if ap.provider.GetArgs() == nil {
@@ -238,11 +251,12 @@ func (i *injectorImpl) clearInstanceDeps(key string) {
 }
 
 func newInjector(binder Binder) Injector {
-	bi, ap, dm := hydrateInjector(binder)
+	bi, ap, dm, km := hydrateInjector(binder)
 	return &injectorImpl{
 		binderMap:         bi,
 		atomicProviderMap: ap,
 		dependencyMap:     dm,
+		keysMap:           km,
 	}
 }
 
@@ -260,9 +274,12 @@ func newManagedInstance(instance Instance, isInstantiated bool) managedInstance 
 
 type injectorMap map[string]managedInstance
 
-func hydrateInjector(binder Binder) (injectorMap, map[string]*atomicProvider, dependencyMap) {
+type keysMap map[string][]string
+
+func hydrateInjector(binder Binder) (injectorMap, map[string]*atomicProvider, dependencyMap, keysMap) {
 	bi := make(injectorMap)
 	ap := make(map[string]*atomicProvider)
+	km := make(keysMap)
 	dm := make(dependencyMap)
 	for _, m := range binder.Packages() {
 		for _, v := range m.Bindings() {
@@ -270,8 +287,10 @@ func hydrateInjector(binder Binder) (injectorMap, map[string]*atomicProvider, de
 				bi[v.GetKey()] = newManagedInstance(v.GetInstance(), false)
 			} else if v.GetProvider() != nil {
 				ap[v.GetKey()] = newAtomicProvider(v.GetProvider())
+			} else if v.GetKeys() != nil {
+				km[v.GetKey()] = v.GetKeys()
 			}
 		}
 	}
-	return bi, ap, dm
+	return bi, ap, dm, km
 }

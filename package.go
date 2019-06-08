@@ -36,10 +36,18 @@ type ConstantBindingBuilder interface {
 	Any(s interface{}) Binding
 }
 
+type KeyBindingBuilder interface {
+	// Bind a singular Key to a grouping of Keys. The passed in Keys will be instantiated by the Injector upon calling
+	// Injector.Get(key). When consumed from the Injector via Get, the output will be a slice of
+	// Instances.
+	Keys(keys ...string) Binding
+}
+
 // Builder for a binding to an Injectable Entity (an Instance or a Provider).
 type InjectableEntityBindingBuilder interface {
 	FactoryBindingBuilder
 	ConstantBindingBuilder
+	KeyBindingBuilder
 
 	// Bind the provided Key to an Instance.
 	Instance(instance Instance) Binding
@@ -77,6 +85,10 @@ type Binding interface {
 
 	// The key that is bound to the Provider or Instance.
 	GetKey() string
+
+	// A group of keys that the Key is bound to. This instructs the Injector to bind the specified Key to a slice of
+	// Instances which are each individually tied to a Key.
+	GetKeys() []string
 }
 
 // Defines a Binding in a Package from a specified key to an Instance or a Provider.
@@ -185,6 +197,10 @@ type injectableEntityBindingBuilderImpl struct {
 	key string
 }
 
+func (m *injectableEntityBindingBuilderImpl) Keys(keys ...string) Binding {
+	return &packageEntryImpl{Key: m.key, Keys: keys}
+}
+
 func (m *injectableEntityBindingBuilderImpl) Any(s interface{}) Binding {
 	return &packageEntryImpl{Instance: Any(s), Key: m.key}
 }
@@ -254,6 +270,11 @@ type packageEntryImpl struct {
 	Provider Provider
 	Instance Instance
 	Key      string
+	Keys     []string
+}
+
+func (m *packageEntryImpl) GetKeys() []string {
+	return m.Keys
 }
 
 func (m *packageEntryImpl) GetKey() string {
