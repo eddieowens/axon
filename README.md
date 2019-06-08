@@ -51,7 +51,7 @@ func main() {
     }
     
     binder := axon.NewBinder(axon.NewPackage(
-        axon.Bind("MyStruct").To().Instance(axon.StructPtr(new(MyStruct))),
+        axon.Bind("MyStruct").To().StructPtr(new(MyStruct)),
         axon.Bind("AnswerToTheUltimateQuestion").To().Int(42),
     ))
     
@@ -120,8 +120,8 @@ func CarFactory(_ axon.Injector, _ axon.Args) axon.Instance {
 func main() {
     binder := axon.NewBinder(axon.NewPackage(
         axon.Bind("Car").To().Factory(CarFactory).WithoutArgs(),
-        axon.Bind("Engine").To().Instance(axon.StructPtr(new(Engine))),
-        axon.Bind("FuelInjector").To().Instance(axon.StructPtr(new(FuelInjector))),
+        axon.Bind("Engine").To().StructPtr(new(Engine)),
+        axon.Bind("FuelInjector").To().StructPtr(new(FuelInjector)),
     ))
     
     injector := axon.NewInjector(binder)
