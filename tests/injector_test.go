@@ -71,6 +71,39 @@ func (i *InjectorTest) TestInjectSlice() {
 	i.ElementsMatch(sl.Slice, []string{"val1", "val2"})
 }
 
+func (i *InjectorTest) TestInjectStruct() {
+	// -- Given
+	//
+	type Raw struct {
+		Random string
+	}
+
+	type Wrapper struct {
+		Raw Raw `inject:"Raw"`
+	}
+
+	expected := Raw{
+		Random: "test",
+	}
+
+	binder := axon.NewBinder(
+		axon.NewPackage(
+			axon.Bind("Raw").To().Any(expected),
+			axon.Bind("Wrapper").To().StructPtr(new(Wrapper)),
+		),
+	)
+
+	inj := axon.NewInjector(binder)
+
+	// -- When
+	//
+	wrapper := inj.Get("Wrapper").GetValue().(*Wrapper)
+
+	// -- Then
+	//
+	i.Equal(expected, wrapper.Raw)
+}
+
 func TestInjectorTest(t *testing.T) {
 	suite.Run(t, new(InjectorTest))
 }
