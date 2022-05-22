@@ -146,8 +146,8 @@ func (i *InjectorTestSuite) TestSettingMutableValue() {
 	i.NoError(err)
 
 	expected := &test{
-		Int: Provide(1),
-		Strct: Provide(&testDep{
+		Int: NewProvider(1),
+		Strct: NewProvider(&testDep{
 			S: "str",
 		}),
 	}
@@ -160,7 +160,7 @@ func (i *InjectorTestSuite) TestSettingMutableValue() {
 
 	// -- Then
 	//
-	expected.Int = Provide(2)
+	expected.Int = NewProvider(2)
 	i.Equal(expected, actual)
 	i.Equal(2, actual.Int.Get())
 }
@@ -437,7 +437,7 @@ func (i *InjectorTestSuite) TestStructProvider() {
 	inj.Add(NewKey("i"), 2)
 	inj.Add(NewKey("m"), mutableMap{"1": "2"})
 
-	expected := &test{P: Provide(&providedStruct{S: 3, I: 2, M: mutableMap{"1": "21"}})}
+	expected := &test{P: NewProvider(&providedStruct{S: 3, I: 2, M: mutableMap{"1": "21"}})}
 	actual := new(test)
 
 	// -- When
@@ -596,6 +596,15 @@ func (i *InjectorTestSuite) TestFailedMutableValue() {
 	// -- Then
 	//
 	i.EqualError(err, "invalid type: field m is type axon.MutableValue but got type axon.mutable")
+}
+
+func (i *InjectorTestSuite) TestProviderGet() {
+	Add("secret", NewProvider("super_secret"))
+	secret := MustGet[*Provider[string]](WithKey("secret"))
+	i.Equal("super_secret", secret.Get())
+
+	Add("secret", NewProvider("even_more_secret"))
+	i.Equal("even_more_secret", secret.Get())
 }
 
 type testInterface interface {

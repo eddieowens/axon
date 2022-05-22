@@ -8,6 +8,22 @@ import (
 // source of data which you want to be updated in multiple places at once even after leaving the Injector. Values returned
 // by Provider.Get should never be stored as that defeats the purpose of the Provider altogether. Instead, Provider.Get should
 // be called every time one wants to read the data which the Provider provides.
+//
+// For example
+//
+//    Add("one", 1)
+//    one := MustGet[int]("one")
+//    fmt.Println(one) // prints 1
+//    Add("one", 2)
+//    fmt.Println(one) // still prints 1
+//
+// To allow for dynamic value updates, you can use a provider.
+//
+//    Add("one", NewProvider(1))
+//    one := MustGet[*Provider[int]]("one")
+//    fmt.Println(one.Get()) // prints 1
+//    Add("one", NewProvider(2))
+//    fmt.Println(one.Get()) // prints 2
 type Provider[T any] struct {
 	val  T
 	lock sync.RWMutex
@@ -19,6 +35,7 @@ func (p *Provider[T]) Set(val T) {
 	p.val = val
 }
 
+// SetValue for a Provider, this supports a val of either T or *Provider[T].
 func (p *Provider[T]) SetValue(val any) error {
 	if val == nil {
 		return nil
@@ -26,7 +43,13 @@ func (p *Provider[T]) SetValue(val any) error {
 
 	v, ok := val.(T)
 	if !ok {
-		return nil
+		prov, ok := val.(*Provider[T])
+		if ok {
+			v, ok = any(prov.val).(T)
+			if !ok {
+				return ErrInvalidType
+			}
+		}
 	}
 
 	p.Set(v)
@@ -43,6 +66,13 @@ type containerProvider[T any] interface {
 	ProvideContainer() (container[T], error)
 	Invalidate()
 	SetConstructor(constructor OnConstructFunc[T])
+
+	// GetValue returns the underlying value for the containerProvider. This value may be the wrapped value or a zero value
+	// if not yet constructed.
+	GetValue() T
+
+	// IsInstantiated returns true if ProvideContainer has ever been called, false otherwise.
+	IsInstantiated() bool
 }
 
 type OnConstructFunc[T any] func(constructed container[T]) error
@@ -66,12 +96,21 @@ func newContainerProvider(val any) containerProvider[any] {
 }
 
 type containerProviderImpl[T any] struct {
-	Value       T
-	Container   container[T]
-	Factory     Factory
-	Once        sync.Once
-	Injector    Injector
-	OnConstruct OnConstructFunc[T]
+	Value        T
+	Container    container[T]
+	Factory      Factory
+	Once         sync.Once
+	Instantiated bool
+	Injector     Injector
+	OnConstruct  OnConstructFunc[T]
+}
+
+func (p *containerProviderImpl[T]) GetValue() T {
+	return p.Value
+}
+
+func (p *containerProviderImpl[T]) IsInstantiated() bool {
+	return p.Instantiated
 }
 
 func (p *containerProviderImpl[T]) SetConstructor(constructor OnConstructFunc[T]) {
@@ -102,6 +141,7 @@ func (p *containerProviderImpl[T]) ProvideContainer() (container[T], error) {
 		return nil, err
 	}
 
+	p.Instantiated = true
 	return p.Container, nil
 }
 

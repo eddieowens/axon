@@ -1,5 +1,8 @@
 package axon
 
+// Factory produces the specified type whenever the Injector is retrieving the value (e.g. during Injector.Get or
+// Injector.Inject). This factory will only ever be called once to construct the value unless a downstream dependency
+// changes. Any Injector.Get method calls within the Build method will be registered as dependencies of the resulting type.
 type Factory interface {
 	Build(inj Injector) (any, error)
 }
@@ -8,6 +11,7 @@ type internalFactory interface {
 	GetZeroValue() any
 }
 
+// NewFactory creates a Factory.
 func NewFactory[T any](f FactoryFunc[T]) Factory {
 	return &factory[T]{
 		Val:         *new(T),

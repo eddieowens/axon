@@ -12,7 +12,7 @@ type ProviderTestSuite struct {
 func (p *ProviderTestSuite) TestSetValueNil() {
 	// -- Given
 	//
-	given := Provide(1)
+	given := NewProvider(1)
 
 	// -- When
 	//
@@ -26,7 +26,7 @@ func (p *ProviderTestSuite) TestSetValueNil() {
 func (p *ProviderTestSuite) TestSetValueWrongType() {
 	// -- Given
 	//
-	given := Provide(1)
+	given := NewProvider(1)
 
 	// -- When
 	//

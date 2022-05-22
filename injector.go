@@ -11,14 +11,25 @@ import (
 )
 
 var (
-	InjectTag          = "inject"
+	// InjectTag is the tag to look up within a struct for injection.
+	InjectTag = "inject"
+
+	// InjectTagValueType instructs the Injector to use the type as a Key rather than the name. If a name is specified,
+	// the name takes precedence.
 	InjectTagValueType = "type"
 )
 
 var (
-	ErrPtrToStruct  = errors.New("value must be a ptr to a struct")
-	ErrNotFound     = errors.New("not found")
-	ErrInvalidType  = errors.New("invalid type")
+	// ErrPtrToStruct if Inject is not passed a ptr to struct.
+	ErrPtrToStruct = errors.New("value must be a ptr to a struct")
+
+	// ErrNotFound key is not found in the Injector.
+	ErrNotFound = errors.New("not found")
+
+	// ErrInvalidType the type in the Injector is not the same as the type that is being injected.
+	ErrInvalidType = errors.New("invalid type")
+
+	// ErrInvalidField the field is not settable.
 	ErrInvalidField = errors.New("invalid field")
 )
 
@@ -28,21 +39,15 @@ type Injector interface {
 	// a struct and the fields that are tagged must be public. If the InjectTag is not present on the struct or if the
 	// value is already set, it will not be injected.
 	//
-	// errors returned:
-	//
-	// ErrNotFound: If a field has an InjectTag but is not found in the Injector.
-	//
-	// ErrInvalidField: If the field is not settable.
-	//
-	// ErrInvalidType: If the type in the Injector is not the same as the type that is being injected.
-	//
-	// ErrPtrToStruct: If d is not a pointer to a struct.
-	//
 	// All errors should be checked with errors.Is as they may be wrapped.
 	Inject(d any, opts ...opts.Opt[InjectorInjectOpts]) error
 
 	// Add adds the val indexed by a Key. The underlying value for a Key should be a comparable value since the underlying
-	// implementation utilizes a map. All calls to Add will overwrite existing values and no checks are done.
+	// implementation utilizes a map. All calls to Add will overwrite existing values and no checks are done. Be aware that
+	// if Add overwrites an existing value, all of that values dependencies will be reconstructed on the next call to Get or
+	// Inject.
+	//
+	// If you want any updates made here to be reflected within the value themselves, use a provider.
 	Add(key Key, val any, ops ...opts.Opt[InjectorAddOpts])
 
 	// Get gets a value given a Key. If Get is unable to find the Key, ErrNotFound is returned. The first call to Get will
@@ -50,13 +55,17 @@ type Injector interface {
 	Get(k Key, o ...opts.Opt[InjectorGetOpts]) (any, error)
 }
 
+// InjectorGetOpts opts for the Injector.Get method.
 type InjectorGetOpts struct {
 }
 
+// InjectorInjectOpts opts for the Injector.Inject method.
 type InjectorInjectOpts struct {
+	// See WithSkipFieldErrs.
 	SkipFieldErr bool
 }
 
+// InjectorAddOpts opts for the Injector.Add method.
 type InjectorAddOpts struct {
 }
 
@@ -110,24 +119,32 @@ func (i *injector) Inject(d any, opts ...opts.Opt[InjectorInjectOpts]) error {
 }
 
 func (i *injector) Add(key Key, val any, _ ...opts.Opt[InjectorAddOpts]) {
-	conVal := newContainerProvider(val)
-
-	if v := key.resolve(i.DepGraph); v != nil {
-		i.DepGraph.RemoveDependencies(key)
-		v.Invalidate()
+	v := key.resolve(i.DepGraph)
+	exists := v != nil
+	var err error
+	if exists && v.IsInstantiated() {
+		if mut, ok := v.GetValue().(MutableValue); ok {
+			err = mut.SetValue(val)
+		}
 	}
 
-	conVal.SetConstructor(func(constructed container[any]) error {
+	if err != nil || !exists {
+		v = newContainerProvider(val)
+		i.DepGraph.Add(key, v)
+	}
+
+	v.SetConstructor(func(constructed container[any]) error {
 		val := mirror.StripPtrs(constructed.GetReflectValue())
 
-		var err error
 		if val.Kind() == reflect.Struct {
 			err = i.injectStructWithOpts(key, val)
 		}
 		return err
 	})
-
-	i.DepGraph.Add(key, conVal)
+	if exists {
+		v.Invalidate()
+		i.DepGraph.RemoveDependencies(key)
+	}
 }
 
 func (i *injector) Get(k Key, _ ...opts.Opt[InjectorGetOpts]) (any, error) {
