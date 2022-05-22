@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/eddieowens/axon/internal/depgraph"
+	"github.com/eddieowens/axon/internal/mirror"
+	"github.com/eddieowens/axon/opts"
 	"reflect"
 	"strings"
 )
@@ -37,30 +39,32 @@ type Injector interface {
 	// ErrPtrToStruct: If d is not a pointer to a struct.
 	//
 	// All errors should be checked with errors.Is as they may be wrapped.
-	Inject(d any, opts ...InjectOpt) error
+	Inject(d any, opts ...opts.Opt[InjectorInjectOpts]) error
 
 	// Add adds the val indexed by a Key. The underlying value for a Key should be a comparable value since the underlying
 	// implementation utilizes a map. All calls to Add will overwrite existing values and no checks are done.
-	Add(key Key, val any)
+	Add(key Key, val any, ops ...opts.Opt[InjectorAddOpts])
 
 	// Get gets a value given a Key. If Get is unable to find the Key, ErrNotFound is returned. The first call to Get will
 	// cause the underlying value to be constructed if it is a Factory.
-	Get(k Key) (any, error)
-
-	getGraph() depgraph.DoubleMap[any, containerProvider[any]]
+	Get(k Key, o ...opts.Opt[InjectorGetOpts]) (any, error)
 }
 
-type InjectOpt func(opts *InjectOpts)
+type InjectorGetOpts struct {
+}
 
-type InjectOpts struct {
+type InjectorInjectOpts struct {
 	SkipFieldErr bool
+}
+
+type InjectorAddOpts struct {
 }
 
 // WithSkipFieldErrs allows for the Injector.Inject method to skip over field errors that are encountered when attempting
 // to inject values onto a struct. The Injector.Inject method may still return an error, but they will not be due to problems
 // encountered on individual fields.
-func WithSkipFieldErrs() InjectOpt {
-	return func(opts *InjectOpts) {
+func WithSkipFieldErrs() opts.Opt[InjectorInjectOpts] {
+	return func(opts *InjectorInjectOpts) {
 		opts.SkipFieldErr = true
 	}
 }
@@ -91,11 +95,7 @@ type injector struct {
 	DepGraph depgraph.DoubleMap[any, containerProvider[any]]
 }
 
-func (i *injector) getGraph() depgraph.DoubleMap[any, containerProvider[any]] {
-	return i.DepGraph
-}
-
-func (i *injector) Inject(d any, opts ...InjectOpt) error {
+func (i *injector) Inject(d any, opts ...opts.Opt[InjectorInjectOpts]) error {
 	val := reflect.ValueOf(d)
 	if val.Kind() != reflect.Ptr || !val.IsValid() {
 		return ErrPtrToStruct
@@ -106,27 +106,23 @@ func (i *injector) Inject(d any, opts ...InjectOpt) error {
 		return ErrPtrToStruct
 	}
 
-	return i.injectStructWithOpts(Key{}, d, val, opts...)
+	return i.injectStructWithOpts(Key{}, val, opts...)
 }
 
-func (i *injector) Add(key Key, val any) {
-	if val == nil {
-		return
-	}
-
+func (i *injector) Add(key Key, val any, _ ...opts.Opt[InjectorAddOpts]) {
 	conVal := newContainerProvider(val)
 
-	if v, ok := i.DepGraph.Lookup(key); ok {
+	if v := key.resolve(i.DepGraph); v != nil {
 		i.DepGraph.RemoveDependencies(key)
 		v.Invalidate()
 	}
 
 	conVal.SetConstructor(func(constructed container[any]) error {
-		val := stripPtrs(constructed.GetReflectValue())
+		val := mirror.StripPtrs(constructed.GetReflectValue())
 
 		var err error
 		if val.Kind() == reflect.Struct {
-			err = i.injectStructWithOpts(key, constructed.GetValue(), val)
+			err = i.injectStructWithOpts(key, val)
 		}
 		return err
 	})
@@ -134,8 +130,8 @@ func (i *injector) Add(key Key, val any) {
 	i.DepGraph.Add(key, conVal)
 }
 
-func (i *injector) Get(k Key) (any, error) {
-	v := i.DepGraph.Get(k)
+func (i *injector) Get(k Key, _ ...opts.Opt[InjectorGetOpts]) (any, error) {
+	v := k.resolve(i.DepGraph)
 	if v == nil {
 		return nil, ErrNotFound
 	}
@@ -148,34 +144,16 @@ func (i *injector) Get(k Key) (any, error) {
 	return con.GetValue(), nil
 }
 
-func (i *injector) injectStructWithOpts(key Key, rawVal any, v reflect.Value, opts ...InjectOpt) error {
-	o := &InjectOpts{}
+func (i *injector) injectStructWithOpts(key Key, v reflect.Value, opts ...opts.Opt[InjectorInjectOpts]) error {
+	o := &InjectorInjectOpts{}
 	for _, v := range opts {
 		v(o)
-	}
-
-	mut := safeCast[MutableValue](rawVal)
-	if mut != nil {
-		v = stripPtrs(reflect.ValueOf(mut))
-		// if the underlying value of the MutableValue is not a struct, we need to grab it, and set it.
-		if v.Kind() != reflect.Struct {
-			if !key.IsEmpty() {
-				con, err := i.resolveValue(key)
-				if err != nil {
-					return err
-				}
-
-				conVal := con.GetValue()
-				return mut.SetValue(conVal)
-			}
-			return nil
-		}
 	}
 
 	return i.injectStruct(key, v, *o)
 }
 
-func (i *injector) injectStruct(key Key, v reflect.Value, o InjectOpts) error {
+func (i *injector) injectStruct(key Key, v reflect.Value, o InjectorInjectOpts) error {
 	for j := 0; j < v.NumField(); j++ {
 		err := i.injectStructField(key, v.Field(j), v.Type().Field(j))
 		if err != nil {
@@ -209,8 +187,8 @@ func (i *injector) injectStructField(key Key, field reflect.Value, strctField re
 }
 
 func (i *injector) resolveValue(key Key) (container[any], error) {
-	dep, ok := i.DepGraph.Lookup(key)
-	if !ok {
+	dep := key.resolve(i.DepGraph)
+	if dep == nil {
 		return nil, fmt.Errorf("failed to inject %s: %w", key.String(), ErrNotFound)
 	}
 
@@ -247,32 +225,29 @@ func setReflectVal(field reflect.Value, container container[any], key Key) error
 	rawVal := container.GetValue()
 	containerVal := container.GetReflectValue()
 
-	if containerVal.Type().Implements(mutableValueType) {
-		return safeCast[MutableValue](rawVal).SetValue(rawVal)
+	// only applicable to check if MutableValue is used as a field on a struct
+	conIsMutable := containerVal.Type().Implements(mutableValueType)
+	if conIsMutable {
+		err := safeCast[MutableValue](rawVal).SetValue(rawVal)
+		if err != nil {
+			return fmt.Errorf("failed to set field %s: %w", key.String(), err)
+		}
+	} else if field.Type().Implements(mutableValueType) {
+		if field.IsNil() {
+			err := mirror.Instantiate(field)
+			if err != nil {
+				return fmt.Errorf("%w: field %s is type %s but got type %s", ErrInvalidType, key.String(), field.Type().String(), containerVal.Type().String())
+			}
+		}
+
+		return getMutableValue(field).SetValue(rawVal)
 	}
 
-	if field.Kind() != containerVal.Kind() {
-		return fmt.Errorf("%w: field %s is type %s while the value in the injector is type %s", ErrInvalidType, key.String(), field.Type().String(), containerVal.Type().String())
+	err := mirror.Set(field, containerVal)
+	if err != nil {
+		return fmt.Errorf("%w: field %s is type %s but got type %s", ErrInvalidType, key.String(), field.Type().String(), containerVal.Type().String())
 	}
-
-	field.Set(containerVal)
 	return nil
-}
-
-func stripPtrs(val reflect.Value) reflect.Value {
-	for val.Kind() == reflect.Ptr && !val.IsZero() {
-		val = val.Elem()
-	}
-
-	return val
-}
-
-func stripTypePtrs(typ reflect.Type) reflect.Type {
-	for typ.Kind() == reflect.Ptr {
-		typ = typ.Elem()
-	}
-
-	return typ
 }
 
 func resolveKey(tag string, field reflect.Value) Key {

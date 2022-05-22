@@ -1,6 +1,7 @@
 package axon
 
 import (
+	"errors"
 	"github.com/eddieowens/axon/internal/depgraph"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -161,6 +162,7 @@ func (i *InjectorTestSuite) TestSettingMutableValue() {
 	//
 	expected.Int = Provide(2)
 	i.Equal(expected, actual)
+	i.Equal(2, actual.Int.Get())
 }
 
 func (i *InjectorTestSuite) TestMutableImplementation() {
@@ -215,7 +217,7 @@ func (i *InjectorTestSuite) TestInjectType() {
 	}
 
 	inj := NewInjector()
-	inj.Add(NewTypeKey[MutableValue](), &mutable{Int: 2})
+	inj.Add(NewTypeKey[MutableValue](&mutable{Int: 2}))
 	actual := new(test)
 	expected := &test{Mutable: &mutable{Int: 1}}
 
@@ -230,8 +232,411 @@ func (i *InjectorTestSuite) TestInjectType() {
 	}
 }
 
+func (i *InjectorTestSuite) TestInjectFailedSetValue() {
+	// -- Given
+	//
+	type test struct {
+		Mutable MutableValue `inject:",type"`
+	}
+
+	inj := NewInjector()
+	inj.Add(NewTypeKey[MutableValue](mutableError{}))
+	actual := new(test)
+
+	// -- When
+	//
+	err := inj.Inject(actual)
+
+	// -- Then
+	//
+	i.EqualError(err, "failed to set field axon.MutableValue: not found")
+}
+
+func (i *InjectorTestSuite) TestInjectTypePtrImpl() {
+	// -- Given
+	//
+	type test struct {
+		T testInterface `inject:",type"`
+	}
+
+	inj := NewInjector()
+	inj.Add(NewTypeKey[testInterface](&testInterfacePtr{Int: 1}))
+
+	actual := new(test)
+	expected := &test{T: &testInterfacePtr{Int: 1}}
+
+	// -- When
+	//
+	err := inj.Inject(actual)
+
+	// -- Then
+	//
+	if i.NoError(err) {
+		i.Equal(expected, actual)
+	}
+}
+
+func (i *InjectorTestSuite) TestInjectTypeValImpl() {
+	// -- Given
+	//
+	type test struct {
+		T testInterface `inject:",type"`
+	}
+
+	inj := NewInjector()
+	inj.Add(NewTypeKey[testInterface](testInterfaceVal{Int: 1}))
+
+	actual := new(test)
+	expected := &test{T: testInterfaceVal{Int: 1}}
+
+	// -- When
+	//
+	err := inj.Inject(actual)
+
+	// -- Then
+	//
+	if i.NoError(err) {
+		i.Equal(expected, actual)
+	}
+}
+
+func (i *InjectorTestSuite) TestInjectTypeAndKey() {
+	// -- Given
+	//
+	type test struct {
+		T testInterface `inject:",type"`
+		A testInterface `inject:"a"`
+	}
+
+	inj := NewInjector()
+	inj.Add(NewTypeKey[testInterface](testInterfaceVal{Int: 1}))
+	inj.Add(NewKey("a"), &testInterfacePtr{Int: 2})
+
+	actual := new(test)
+	expected := &test{T: testInterfaceVal{Int: 1}, A: &testInterfacePtr{Int: 2}}
+
+	// -- When
+	//
+	err := inj.Inject(actual)
+
+	// -- Then
+	//
+	if i.NoError(err) {
+		i.Equal(expected, actual)
+	}
+}
+
+func (i *InjectorTestSuite) TestInjectMissingField() {
+	// -- Given
+	//
+	type test struct {
+		I int `inject:"i"`
+	}
+
+	inj := NewInjector()
+	actual := new(test)
+
+	// -- When
+	//
+	err := inj.Inject(actual)
+
+	// -- Then
+	//
+	i.EqualError(err, "failed to inject i: not found")
+}
+
+func (i *InjectorTestSuite) TestInjectWrongType() {
+	// -- Given
+	//
+	type test struct {
+		I int `inject:"i"`
+	}
+
+	inj := NewInjector()
+	inj.Add(NewKey("i"), "1")
+
+	// -- When
+	//
+	err := inj.Inject(new(test))
+
+	// -- Then
+	//
+	i.EqualError(err, "invalid type: field i is type int but got type string")
+}
+
+func (i *InjectorTestSuite) TestInjectSkipErr() {
+	// -- Given
+	//
+	type test struct {
+		I int    `inject:"i"`
+		S string `inject:",type"`
+	}
+
+	inj := NewInjector()
+	inj.Add(NewKey("i"), "1")
+	inj.Add(NewTypeKey[string]("str"))
+	expected := &test{
+		S: "str",
+	}
+	actual := new(test)
+
+	// -- When
+	//
+	err := inj.Inject(actual, WithSkipFieldErrs())
+
+	// -- Then
+	//
+	if i.NoError(err) {
+		i.Equal(expected, actual)
+	}
+}
+
+func (i *InjectorTestSuite) TestNonStructMutableValue() {
+	// -- Given
+	//
+	type test struct {
+		M mutableMap `inject:"m"`
+	}
+
+	inj := NewInjector()
+
+	inj.Add(NewKey("m"), mutableMap{"1": "2"})
+
+	expected := &test{
+		M: mutableMap{"1": "21"},
+	}
+	actual := new(test)
+
+	// -- When
+	//
+	err := inj.Inject(actual)
+
+	// -- Then
+	//
+	if i.NoError(err) {
+		i.Equal(expected, actual)
+	}
+}
+
+func (i *InjectorTestSuite) TestStructProvider() {
+	// -- Given
+	//
+	type providedStruct struct {
+		I int        `inject:"i"`
+		M mutableMap `inject:"m"`
+		S int
+	}
+
+	type test struct {
+		P *Provider[*providedStruct] `inject:"p"`
+	}
+
+	inj := NewInjector()
+
+	inj.Add(NewKey("p"), &providedStruct{S: 3})
+	inj.Add(NewKey("i"), 2)
+	inj.Add(NewKey("m"), mutableMap{"1": "2"})
+
+	expected := &test{P: Provide(&providedStruct{S: 3, I: 2, M: mutableMap{"1": "21"}})}
+	actual := new(test)
+
+	// -- When
+	//
+	err := inj.Inject(actual)
+
+	// -- Then
+	//
+	if i.NoError(err) {
+		i.Equal(expected, actual)
+	}
+}
+
+func (i *InjectorTestSuite) TestInjectNonPtr() {
+	// -- Given
+	//
+	inj := NewInjector()
+
+	// -- When
+	//
+	err := inj.Inject(testDep{})
+
+	// -- Then
+	//
+	i.EqualError(err, "value must be a ptr to a struct")
+}
+
+func (i *InjectorTestSuite) TestInjectNonStruct() {
+	// -- Given
+	//
+	inj := NewInjector()
+	p := 1
+
+	// -- When
+	//
+	err := inj.Inject(&p)
+
+	// -- Then
+	//
+	i.EqualError(err, "value must be a ptr to a struct")
+}
+
+func (i *InjectorTestSuite) TestInjectNil() {
+	// -- Given
+	//
+	inj := NewInjector()
+	var given *test
+
+	// -- When
+	//
+	err := inj.Inject(given)
+
+	// -- Then
+	//
+	i.EqualError(err, "value must be a ptr to a struct")
+}
+
+func (i *InjectorTestSuite) TestFailedFactory() {
+	// -- Given
+	//
+	inj := NewInjector()
+	inj.Add(NewKey("1"), NewFactory[string](func(inj Injector) (string, error) {
+		return "", errors.New("error")
+	}))
+
+	// -- When
+	//
+	actual, err := inj.Get(NewKey("1"))
+
+	// -- Then
+	//
+	i.EqualError(err, "error")
+	i.Nil(actual)
+}
+
+func (i *InjectorTestSuite) TestInjectWithFactory() {
+	// -- Given
+	//
+	type test struct {
+		S string `inject:"s"`
+	}
+
+	inj := NewInjector()
+	inj.Add(NewKey("s"), NewFactory[string](func(inj Injector) (string, error) {
+		return "1", nil
+	}))
+	actual := new(test)
+	expected := &test{S: "1"}
+
+	// -- When
+	//
+	err := inj.Inject(actual)
+
+	// -- Then
+	//
+	if i.NoError(err) {
+		i.Equal(expected, actual)
+	}
+}
+
+func (i *InjectorTestSuite) TestInjectFailedFactory() {
+	// -- Given
+	//
+	type test struct {
+		S string `inject:"s"`
+	}
+
+	inj := NewInjector()
+	inj.Add(NewKey("s"), NewFactory[string](func(inj Injector) (string, error) {
+		return "", errors.New("error")
+	}))
+	actual := new(test)
+
+	// -- When
+	//
+	err := inj.Inject(actual)
+
+	// -- Then
+	//
+	i.EqualError(err, "failed to get field s: error")
+}
+
+func (i *InjectorTestSuite) TestUnsettableField() {
+	// -- Given
+	//
+	type test struct {
+		unset int `inject:"s"`
+	}
+
+	inj := NewInjector()
+	inj.Add(NewKey("s"), 1)
+
+	// -- When
+	//
+	err := inj.Inject(new(test))
+
+	// -- Then
+	//
+	i.EqualError(err, "invalid field: field s is not settable")
+}
+
+func (i *InjectorTestSuite) TestFailedMutableValue() {
+	// -- Given
+	//
+	type test struct {
+		M MutableValue `inject:"m"`
+	}
+
+	inj := NewInjector()
+	inj.Add(NewKey("m"), mutable{})
+
+	// -- When
+	//
+	err := inj.Inject(new(test))
+
+	// -- Then
+	//
+	i.EqualError(err, "invalid type: field m is type axon.MutableValue but got type axon.mutable")
+}
+
+type testInterface interface {
+	testSigil()
+}
+
+type testInterfaceVal struct {
+	Int int
+}
+
+func (t testInterfaceVal) testSigil() {}
+
+type testInterfacePtr struct {
+	Int int
+}
+
+func (t *testInterfacePtr) testSigil() {}
+
 type mutable struct {
 	Int int
+}
+
+type mutableError struct {
+}
+
+func (m mutableError) SetValue(_ any) error {
+	return ErrNotFound
+}
+
+type mutableMap map[string]string
+
+func (m mutableMap) SetValue(val any) error {
+	in, ok := val.(mutableMap)
+	if !ok {
+		return ErrInvalidType
+	}
+
+	for k, v := range in {
+		m[k] = v + "1"
+	}
+	return nil
 }
 
 func (m *mutable) SetValue(val any) error {

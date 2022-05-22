@@ -33,12 +33,6 @@ func (p *Provider[T]) SetValue(val any) error {
 	return nil
 }
 
-func (p *Provider[T]) GetValue() any {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	return p.val
-}
-
 func (p *Provider[T]) Get() T {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
@@ -49,11 +43,6 @@ type containerProvider[T any] interface {
 	ProvideContainer() (container[T], error)
 	Invalidate()
 	SetConstructor(constructor OnConstructFunc[T])
-	IsInstantiated() bool
-
-	// GetComparableValue returns a value that should be used in type assertions and should not be used as a representation
-	// of the actual value that the underlying container holds.
-	GetComparableValue() T
 }
 
 type OnConstructFunc[T any] func(constructed container[T]) error
@@ -83,14 +72,6 @@ type containerProviderImpl[T any] struct {
 	Once        sync.Once
 	Injector    Injector
 	OnConstruct OnConstructFunc[T]
-}
-
-func (p *containerProviderImpl[T]) GetComparableValue() T {
-	return p.Value
-}
-
-func (p *containerProviderImpl[T]) IsInstantiated() bool {
-	return p.Container != nil
 }
 
 func (p *containerProviderImpl[T]) SetConstructor(constructor OnConstructFunc[T]) {

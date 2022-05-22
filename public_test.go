@@ -32,6 +32,23 @@ func (p *PublicTestSuite) TestGet() {
 	}
 }
 
+func (p *PublicTestSuite) TestGetWithKey() {
+	// -- Given
+	//
+	Add("", "2")
+	Add("1", 3)
+
+	// -- When
+	//
+	actual, err := Get[int](WithKey(NewKey("1")))
+
+	// -- Then
+	//
+	if p.NoError(err) {
+		p.Equal(3, actual)
+	}
+}
+
 func (p *PublicTestSuite) TestGetWrongType() {
 	// -- Given
 	//
@@ -43,7 +60,7 @@ func (p *PublicTestSuite) TestGetWrongType() {
 
 	// -- Then
 	//
-	if p.EqualError(err, "expected 1 key to be type int but got string: invalid type") {
+	if p.EqualError(err, "invalid type: expected 1 key to be type int but got string") {
 		p.Equal(0, actual)
 	}
 }
@@ -94,7 +111,7 @@ func (p *PublicTestSuite) TestWithFactoryWrongType() {
 
 	// -- Then
 	//
-	p.EqualError(err, "expected 2 key to be type int but got string: invalid type")
+	p.EqualError(err, "invalid type: expected 2 key to be type int but got string")
 	p.Zero(actual)
 }
 
@@ -115,6 +132,12 @@ func (p *PublicTestSuite) TestWithFactoryError() {
 	//
 	p.EqualError(err, "error")
 	p.Zero(actual)
+}
+
+func (p *PublicTestSuite) TestMustGetKeyPanics() {
+	p.Panics(func() {
+		MustGet[int]()
+	})
 }
 
 func TestPublicTestSuite(t *testing.T) {

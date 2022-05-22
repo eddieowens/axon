@@ -1,8 +1,8 @@
 package depgraph
 
+import "github.com/eddieowens/axon/maps"
+
 type MutableRangeFunc[K any, V any] func(key K, val V, p DepMap[K, V]) bool
-type RangeFunc[K any, V any] func(key K, val V) bool
-type FindFunc[K any, V any] func(key K, val V) bool
 
 type DoubleMap[K any, V any] interface {
 	DepMap[K, V]
@@ -20,17 +20,8 @@ type DoubleMap[K any, V any] interface {
 	RemoveDependencies(key K)
 }
 
-type Map[K any, V any] interface {
-	Remove(key K)
-	Add(key K, val V)
-	Get(key K) V
-	Lookup(key K) (V, bool)
-	Range(r RangeFunc[K, V])
-	Find(r FindFunc[K, V]) V
-}
-
 type DepMap[K any, V any] interface {
-	Map[K, V]
+	maps.Map[K, V]
 	AddDependencies(key K, keys ...K)
 }
 
@@ -53,7 +44,7 @@ type doubleMap[V any] struct {
 	Vals         map[any]V
 }
 
-func (m *doubleMap[V]) Find(r FindFunc[any, V]) (v V) {
+func (m *doubleMap[V]) Find(r maps.FindFunc[any, V]) (v V) {
 	for k, v := range m.Vals {
 		if r(k, v) {
 			return v
@@ -88,7 +79,7 @@ func (m *doubleMap[V]) AddDependencies(key any, keys ...any) {
 	}
 }
 
-func (m *doubleMap[V]) Range(r RangeFunc[any, V]) {
+func (m *doubleMap[V]) Range(r maps.RangeFunc[any, V]) {
 	for k, v := range m.Vals {
 		ok := r(k, v)
 		if !ok {
@@ -139,16 +130,6 @@ func (m *doubleMap[V]) Remove(key any) {
 
 func (m *doubleMap[V]) Add(key any, val V) {
 	m.Vals[key] = val
-}
-
-func (m *doubleMap[V]) Keys() []any {
-	keys := make([]any, len(m.Vals))
-	i := 0
-	for k := range m.Vals {
-		keys[i] = k
-		i++
-	}
-	return keys
 }
 
 func getOrInit(ma map[any]Set[any], key any) Set[any] {

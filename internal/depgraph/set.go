@@ -3,7 +3,6 @@ package depgraph
 type Set[K any] interface {
 	Add(key K)
 	Remove(key K)
-	Exists(key K) bool
 	GetAll() []K
 }
 
@@ -33,8 +32,4 @@ func (s *set[K]) Add(key K) {
 
 func (s *set[K]) Remove(key K) {
 	delete(s.Map, key)
-}
-
-func (s *set[K]) Exists(key K) bool {
-	return s.Map[key]
 }
