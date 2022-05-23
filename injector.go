@@ -129,7 +129,7 @@ func (i *injector) Add(key Key, val any, _ ...opts.Opt[InjectorAddOpts]) {
 	}
 
 	if err != nil || !exists {
-		v = newContainerProvider(val)
+		v = newContainerProvider(i, val)
 		i.DepGraph.Add(key, v)
 	}
 
@@ -156,6 +156,10 @@ func (i *injector) Get(k Key, _ ...opts.Opt[InjectorGetOpts]) (any, error) {
 	con, err := v.ProvideContainer()
 	if err != nil {
 		return nil, err
+	}
+
+	for _, v := range con.GetExternalDependencies() {
+		i.DepGraph.AddDependencies(k, v)
 	}
 
 	return con.GetValue(), nil

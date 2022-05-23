@@ -1,6 +1,7 @@
 package axon
 
 import (
+	"github.com/eddieowens/axon/opts"
 	"sync"
 )
 
@@ -77,9 +78,10 @@ type containerProvider[T any] interface {
 
 type OnConstructFunc[T any] func(constructed container[T]) error
 
-func newContainerProvider(val any) containerProvider[any] {
+func newContainerProvider(inj Injector, val any) containerProvider[any] {
 	p := &containerProviderImpl[any]{
-		Value: val,
+		Value:    val,
+		Injector: inj,
 	}
 
 	fact, ok := val.(Factory)
@@ -122,15 +124,16 @@ func (p *containerProviderImpl[T]) ProvideContainer() (container[T], error) {
 	p.Once.Do(func() {
 		val := p.Value
 		if p.Container == nil {
+			kt := newKeyTracker(p.Injector)
 			if p.Factory != nil {
 				var v any
-				v, err = p.Factory.Build(p.Injector)
+				v, err = p.Factory.Build(kt)
 				if err != nil {
 					return
 				}
 				val = v.(T)
 			}
-			p.Container = newContainer(val)
+			p.Container = newContainer(val, kt.keysGotten...)
 
 			if p.OnConstruct != nil {
 				err = p.OnConstruct(p.Container)
@@ -147,4 +150,21 @@ func (p *containerProviderImpl[T]) ProvideContainer() (container[T], error) {
 
 func (p *containerProviderImpl[T]) Invalidate() {
 	p.Once = sync.Once{}
+}
+
+func newKeyTracker(i Injector) *keyTracker {
+	return &keyTracker{
+		Injector:   i,
+		keysGotten: make([]Key, 0),
+	}
+}
+
+type keyTracker struct {
+	Injector
+	keysGotten []Key
+}
+
+func (t *keyTracker) Get(k Key, _ ...opts.Opt[InjectorGetOpts]) (any, error) {
+	t.keysGotten = append(t.keysGotten, k)
+	return t.Injector.Get(k)
 }

@@ -27,6 +27,9 @@ type KeyConstraint interface {
 	string
 }
 
+// NewKey creates a general purpose Key with any KeyConstraint value. Generally used with a string
+//
+//    NewKey("my_key")
 func NewKey[V KeyConstraint](val V) Key {
 	return Key{val: val}
 }

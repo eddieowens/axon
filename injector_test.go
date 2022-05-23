@@ -607,6 +607,30 @@ func (i *InjectorTestSuite) TestProviderGet() {
 	i.Equal("even_more_secret", secret.Get())
 }
 
+func (i *InjectorTestSuite) TestFactoryWithDependencies() {
+	// -- Given
+	//
+	inj := &injector{DepGraph: depgraph.NewDoubleMap[containerProvider[any]]()}
+	inj.Add(NewKey("key"), "val")
+	expected := 1
+	inj.Add(NewKey("fact"), NewFactory[int](func(inj Injector) (int, error) {
+		val, _ := inj.Get(NewKey("key"))
+		i.Equal("val", val)
+		return expected, nil
+	}))
+
+	// -- When
+	//
+	actual, err := inj.Get(NewKey("fact"))
+
+	// -- Then
+	//
+	if i.NoError(err) {
+		i.Equal(expected, actual)
+		i.ElementsMatch([]Key{NewKey("key")}, inj.DepGraph.GetDependencies(NewKey("fact")))
+	}
+}
+
 type testInterface interface {
 	testSigil()
 }

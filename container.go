@@ -7,17 +7,25 @@ import (
 type container[T any] interface {
 	GetValue() T
 	GetReflectValue() reflect.Value
+	// GetExternalDependencies returns Keys that may be required that aren't explicitly listed on the container's value e.g. dependencies grabbed in a Factory.
+	GetExternalDependencies() []Key
 }
 
-func newContainer[T any](v T) container[T] {
+func newContainer[T any](v T, externalDeps ...Key) container[T] {
 	return &containerImpl[T]{
-		Value: v,
+		Value:                v,
+		ExternalDependencies: externalDeps,
 	}
 }
 
 type containerImpl[T any] struct {
-	Value        T
-	ReflectValue *reflect.Value
+	Value                T
+	ReflectValue         *reflect.Value
+	ExternalDependencies []Key
+}
+
+func (c *containerImpl[T]) GetExternalDependencies() []Key {
+	return c.ExternalDependencies
 }
 
 func (c *containerImpl[T]) GetValue() T {
