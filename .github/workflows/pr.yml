@@ -1,0 +1,26 @@
+name: PR
+
+on:
+  push:
+    branches-ignore:
+      - master
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        name: Checkout code
+      - uses: actions/setup-go@v2
+        name: Set up Go
+        with:
+          go-version: 1.18
+      - name: Test and coverage
+        run: |
+          go test -coverprofile=c.out
+          total=`go tool cover -func=c.out | grep total | grep -Eo '[0-9]+\.[0-9]+'`
+          echo "Test coverage ${total}"
+          if (( $(echo "$total < 99" | bc -l) )); then
+            echo "Current test coverage: ${total}, expected 99"
+            exit 1
+          fi
